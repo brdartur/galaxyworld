@@ -32,6 +32,7 @@ interface SceneProps {
   initialDays: number;
   bgTheme: string;
   showUfo: boolean;
+  showAstronaut: boolean;
   earthMsg: string;
   marsMsgs: string[];
   onSelect: (id: string | null) => void;
