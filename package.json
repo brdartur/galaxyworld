@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/activities.test.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

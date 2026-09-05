@@ -1,6 +1,10 @@
+import { ACTIVITY_LABELS, type ActivitySettings, type ActivityKey } from "../lib/activitySettings";
+
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
 interface Props {
+  activities: ActivitySettings;
+  onToggleActivity: (key: ActivityKey) => void;
   playing: boolean;
   onTogglePlay: () => void;
   speed: number; // 1..365 симуляционных суток в секунду
@@ -26,6 +30,8 @@ interface Props {
 const LOG365 = Math.log(365);
 
 export default function ControlBar({
+  activities,
+  onToggleActivity,
   playing,
   onTogglePlay,
   speed,
@@ -209,6 +215,11 @@ export default function ControlBar({
         </svg>
         <span className="font-mono text-[11px] font-semibold tracking-wide text-amber">СООБЩЕНИЯ</span>
       </button>
+      <div className="flex w-full max-w-[88vw] gap-1.5 overflow-x-auto border-t border-line pt-2 pb-1" role="group" aria-label="Сценарии и эффекты">
+        {(Object.keys(ACTIVITY_LABELS) as ActivityKey[]).map(key => (
+          <Toggle key={key} active={activities[key]} onClick={() => onToggleActivity(key)} label={ACTIVITY_LABELS[key]} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -218,7 +229,7 @@ function Toggle({ active, onClick, label }: { active: boolean; onClick: () => vo
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[11px] tracking-wide transition-all duration-150 active:scale-90 ${
+      className={`flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[11px] tracking-wide transition-all duration-150 active:scale-90 ${
         active ? "border-teal/50 bg-teal/10 text-teal" : "border-line text-faint hover:text-dim"
       }`}
     >

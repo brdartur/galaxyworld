@@ -2,6 +2,9 @@ import { useEffect, useRef } from "react";
 import { PLANETS, SUN, SPIN_DAYS, type BodyData } from "../data/planets";
 import { getTexture } from "../lib/textures";
 
+import { SURFACE_DURATION, ROVER_PLANETS, smooth, type ActivitySettings } from "../lib/activitySettings";
+import { drawSurfaceExplorer, drawRover, drawStation, drawSolarActivity, drawMartianShip } from "../lib/activityDrawing";
+
 const TAU = Math.PI * 2;
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -329,6 +332,7 @@ function buildFrame(body: BodyData, k: number): HTMLCanvasElement {
 }
 
 interface Props {
+  activities: ActivitySettings;
   playing: boolean;
   speed: number;
   showOrbits: boolean;
@@ -526,7 +530,7 @@ export default function SolarCanvas(props: Props) {
     let nextMeteor = 0.8;
     let nextShower = 12;
     let nextUfo = 7;
-    let nextRocket = 15;
+    let nextRocket = 2;
     let nextBH = 24;
     let nextNova = 18;
     let nextDisk = 6;
@@ -666,8 +670,8 @@ export default function SolarCanvas(props: Props) {
       // Используем те же экранные координаты и радиус, что и при отрисовке планеты.
       const target = placed.find((body) => body.id === PLANETS[a.targetIdx].id);
       if (!target) return;
-      const hoverY = target.y - target.r - 35;
-      const landY = target.y - target.r - 9;
+      const hoverY = target.y - target.r - 95;
+      const landY = target.y - target.r - 24;
 
       if (a.mode === "toPlanet") {
         a.flyT = Math.min(1, a.flyT + d / 3);
@@ -675,7 +679,7 @@ export default function SolarCanvas(props: Props) {
         const arc = -50 * Math.sin(Math.PI * e);
         a.x = a.fromX + (target.x - a.fromX) * e;
         a.y = a.fromY + (hoverY - a.fromY) * e + arc;
-        a.angle = Math.atan2(hoverY - a.fromY, target.x - a.fromX) * 0.3;
+        a.angle = Math.atan2(hoverY - a.fromY, target.x - a.fromX);
 
         if (a.flyT >= 1) {
           a.mode = "landing";
@@ -686,17 +690,18 @@ export default function SolarCanvas(props: Props) {
         const progress = Math.min(1, a.t / 2);
         a.x = target.x + Math.sin(progress * Math.PI) * 8;
         a.y = hoverY + (landY - hoverY) * progress;
-        a.angle = 0;
+        a.angle += (-Math.PI / 2 - a.angle) * Math.min(1, d * 5);
         if (progress >= 1) {
           a.mode = "surface";
           a.t = 0;
-          a.hold = 20 + Math.random() * 20;
+          a.hold = SURFACE_DURATION;
           a.drill = 0;
         }
       } else if (a.mode === "surface") {
         // После посадки следуем за планетой, пока она движется по орбите.
         a.x = target.x;
         a.y = landY;
+        a.angle = -Math.PI / 2;
         a.t += d;
         a.drill = Math.min(1, a.t / a.hold);
         if (a.t >= a.hold) {
@@ -711,8 +716,8 @@ export default function SolarCanvas(props: Props) {
         const progress = Math.min(1, a.t / a.leaveT);
         // Отсчёт от точки взлёта, а не прибавление смещения каждый кадр.
         a.x = a.fromX + Math.sin(progress * Math.PI) * 15;
-        a.y = a.fromY - progress * 50;
-        a.angle = -0.2;
+        a.y = a.fromY - progress * 95;
+        a.angle = -Math.PI / 2;
         if (progress >= 1) {
           a.mode = "toPlanet";
           a.flyT = 0;
@@ -1061,9 +1066,10 @@ export default function SolarCanvas(props: Props) {
       ctx.save();
       ctx.translate(a.x, a.y);
       ctx.rotate(a.angle);
+      ctx.scale(2, 2);
       
       // пламя двигателя (при полёте и взлёте)
-      if (a.mode === "toPlanet" || a.mode === "takeoff") {
+      if (a.mode === "toPlanet" || a.mode === "takeoff" || a.mode === "landing") {
         const flicker = Math.sin(worldT * 20) * 3 + Math.cos(worldT * 13) * 2;
         const flameGrad = ctx.createLinearGradient(-12, 0, -28 - flicker, 0);
         flameGrad.addColorStop(0, "#fff7d0");
@@ -1173,13 +1179,13 @@ export default function SolarCanvas(props: Props) {
       
       ctx.restore();
       
-      // подпись статуса (опционально)
-      if (a.mode === "surface" && a.drill > 0.3) {
-        ctx.font = '500 9px "JetBrains Mono", monospace';
-        ctx.textAlign = "center";
-        ctx.fillStyle = "rgba(140,255,230,0.9)";
-        const drillText = a.drill >= 1 ? "ГОТОВО" : `БУРЕНИЕ ${Math.round(a.drill * 100)}%`;
-        ctx.fillText(drillText, a.x, a.y - 25);
+      if (a.mode === "surface") {
+        const target = placed.find(body => body.id === PLANETS[a.targetIdx].id);
+        if (target) {
+          ctx.save(); ctx.translate(target.x, target.y);
+          drawSurfaceExplorer(ctx, target.r, a.t, propsRef.current.activities);
+          ctx.restore();
+        }
       }
     };
 
@@ -1469,9 +1475,9 @@ export default function SolarCanvas(props: Props) {
       }));
 
       // центр приподнят: снизу — пульт управления, орбиты не закрываются
-      const topRes = H < 720 ? 46 : 20;
-      const bottomRes = clamp(H * 0.17, 94, 152);
-      cx = W / 2;
+      const topRes = H < 520 ? 86 : 105;
+      const bottomRes = clamp(H * 0.24, 145, 205) + 50;
+      cx = W >= 900 ? W * 0.43 : W / 2;
       cy = topRes + (H - topRes - bottomRes) / 2;
 
       /* фон под текущую тему — prerender */
@@ -1524,10 +1530,10 @@ export default function SolarCanvas(props: Props) {
 
     const layout = () => {
       // та же геометрия, что и в resize(): снизу зарезервировано место под пульт
-      const topRes = H < 720 ? 46 : 20;
-      const bottomRes = clamp(H * 0.17, 94, 152);
+      const topRes = H < 520 ? 86 : 105;
+      const bottomRes = clamp(H * 0.24, 145, 205) + 50;
       const usableH = H - topRes - bottomRes;
-      const maxR = Math.min(W / 2 - 24, usableH / 2 - 4);
+      const maxR = Math.min(W / 2 - 55, usableH / 2 - 4);
       const sunR = clamp(Math.min(W, usableH) * 0.135, 45, 81);
       const inner0 = sunR + 16;
       const k = (maxR - inner0) / Math.sqrt(30.05);
@@ -2191,7 +2197,7 @@ export default function SolarCanvas(props: Props) {
         const hsPrev = hoverScales.get(d.id) ?? 1;
         const hsCur = hsPrev + (hsTarget - hsPrev) * 0.16;
         hoverScales.set(d.id, hsCur);
-        const pr = clamp(3.1 + 6.4 * Math.sqrt(d.diameterKm / 142984), 3.4, 11) * 3 * scale * hsCur;
+        const pr = clamp(3.1 + 6.4 * Math.sqrt(d.diameterKm / 142984), 3.4, 11) * 6 * scale * hsCur;
 
         // короткий малозаметный шлейф
         ctx.lineCap = "round";
@@ -2348,6 +2354,11 @@ export default function SolarCanvas(props: Props) {
         ctx.lineWidth = 1.3;
         ctx.stroke();
         ctx.setLineDash([]);
+      }
+
+      if (p.activities.solar) {
+        ctx.save(); ctx.translate(cx, cy);
+        drawSolarActivity(ctx, sunR, worldT); ctx.restore();
       }
 
       /* ---- подписи ---- */
@@ -2594,152 +2605,31 @@ export default function SolarCanvas(props: Props) {
       stepAstronaut(dt);
       drawAstronaut();
 
-      /* ---- ракета с марсианином ---- */
+      /* ---- увеличенная ракета: марсианин машет из иллюминатора ---- */
       if (rocket) {
         rocket.t += dt / 30;
         if (rocket.t >= 1) rocket = null;
-        else {
-          const rk = rocket;
-          const rx = rk.dir > 0 ? -60 + rk.t * (W + 120) : W + 60 - rk.t * (W + 120);
-          const ry = rk.by + Math.sin(rk.t * Math.PI * 2) * 20;
-          ctx.save();
-          ctx.translate(rx, ry);
-          ctx.scale(rk.dir, 1);
-          ctx.rotate(-0.08);
-          /* свечение выхлопа */
-          const exh = ctx.createRadialGradient(-24, 0, 1, -24, 0, 14);
-          exh.addColorStop(0, "rgba(255,181,71,0.4)");
-          exh.addColorStop(1, "rgba(255,181,71,0)");
-          ctx.fillStyle = exh;
-          ctx.beginPath();
-          ctx.arc(-24, 0, 14, 0, TAU);
-          ctx.fill();
-          /* внешний слой пламени */
-          const fl = 10 + Math.abs(Math.sin(worldT * 26)) * 9;
-          const fgr = ctx.createLinearGradient(-16, 0, -26 - fl, 0);
-          fgr.addColorStop(0, "#fff3c4");
-          fgr.addColorStop(0.4, "#ffb547");
-          fgr.addColorStop(1, "rgba(255,90,40,0)");
-          ctx.fillStyle = fgr;
-          ctx.beginPath();
-          ctx.moveTo(-16, -3.4);
-          ctx.lineTo(-26 - fl, 0);
-          ctx.lineTo(-16, 3.4);
-          ctx.closePath();
-          ctx.fill();
-          /* внутренний слой пламени */
-          const fl2 = 5 + Math.abs(Math.sin(worldT * 31)) * 5;
-          const fgr2 = ctx.createLinearGradient(-16, 0, -22 - fl2, 0);
-          fgr2.addColorStop(0, "#ffffff");
-          fgr2.addColorStop(1, "rgba(255,243,196,0)");
-          ctx.fillStyle = fgr2;
-          ctx.beginPath();
-          ctx.moveTo(-16, -1.8);
-          ctx.lineTo(-22 - fl2, 0);
-          ctx.lineTo(-16, 1.8);
-          ctx.closePath();
-          ctx.fill();
-          /* ударные ромбы в струе */
-          ctx.fillStyle = "rgba(255,250,230,0.75)";
-          for (let q = 0; q < 3; q++) {
-            const dx = -18.5 - q * 3.4;
-            const s2 = 1.15 - q * 0.28;
-            ctx.beginPath();
-            ctx.moveTo(dx - s2, 0);
-            ctx.lineTo(dx, -s2 * 0.8);
-            ctx.lineTo(dx + s2, 0);
-            ctx.lineTo(dx, s2 * 0.8);
-            ctx.closePath();
-            ctx.fill();
-          }
-          const rb = ctx.createLinearGradient(0, -6, 0, 6);
-          rb.addColorStop(0, "#e8eef8");
-          rb.addColorStop(1, "#8fa0bd");
-          ctx.fillStyle = rb;
-          ctx.beginPath();
-          ctx.moveTo(-16, -5);
-          ctx.lineTo(10, -5);
-          ctx.quadraticCurveTo(19, 0, 10, 5);
-          ctx.lineTo(-16, 5);
-          ctx.closePath();
-          ctx.fill();
-          ctx.strokeStyle = "rgba(30,40,64,0.7)";
-          ctx.lineWidth = 1;
-          ctx.stroke();
-          /* цилиндрическое затенение корпуса */
-          const cyl = ctx.createLinearGradient(0, -5, 0, 5);
-          cyl.addColorStop(0, "rgba(255,255,255,0.35)");
-          cyl.addColorStop(0.4, "rgba(255,255,255,0)");
-          cyl.addColorStop(0.75, "rgba(20,30,50,0.16)");
-          cyl.addColorStop(1, "rgba(20,30,50,0.4)");
-          ctx.fillStyle = cyl;
-          ctx.beginPath();
-          ctx.moveTo(-16, -5);
-          ctx.lineTo(10, -5);
-          ctx.quadraticCurveTo(19, 0, 10, 5);
-          ctx.lineTo(-16, 5);
-          ctx.closePath();
-          ctx.fill();
-          /* технологические швы */
-          ctx.strokeStyle = "rgba(60,74,100,0.55)";
-          ctx.lineWidth = 0.6;
-          for (const sx of [-11, -3, 5]) {
-            ctx.beginPath();
-            ctx.moveTo(sx, -5);
-            ctx.lineTo(sx, 5);
-            ctx.stroke();
-          }
-          ctx.fillStyle = "#ff5d5d";
-          ctx.beginPath();
-          ctx.moveTo(10, -5);
-          ctx.quadraticCurveTo(19, 0, 10, 5);
-          ctx.closePath();
-          ctx.fill();
-          ctx.beginPath();
-          ctx.moveTo(-16, -5);
-          ctx.lineTo(-22, -9);
-          ctx.lineTo(-16, -1.5);
-          ctx.closePath();
-          ctx.fill();
-          ctx.beginPath();
-          ctx.moveTo(-16, 5);
-          ctx.lineTo(-22, 9);
-          ctx.lineTo(-16, 1.5);
-          ctx.closePath();
-          ctx.fill();
-          /* красные полосы и нижняя ступень */
-          ctx.fillStyle = "#e04a3f";
-          ctx.fillRect(-6, -5, 2.4, 10);
-          ctx.fillRect(3, -5, 1.6, 10);
-          ctx.fillStyle = "#a8b4ca";
-          ctx.fillRect(-16, -5, 4, 10);
-          ctx.fillStyle = "#3c4250";
-          ctx.beginPath();
-          ctx.moveTo(-16, -3);
-          ctx.lineTo(-19, -2.2);
-          ctx.lineTo(-19, 2.2);
-          ctx.lineTo(-16, 3);
-          ctx.closePath();
-          ctx.fill();
-          ctx.fillStyle = "#0e2233";
-          ctx.beginPath();
-          ctx.arc(-2, 0, 4.6, 0, TAU);
-          ctx.fill();
-          ctx.strokeStyle = "#cfe0ff";
-          ctx.stroke();
-          ctx.fillStyle = "#6fe08a";
-          ctx.beginPath();
-          ctx.arc(-2, 0.4, 3, 0, TAU);
-          ctx.fill();
-          ctx.fillStyle = "#08220f";
-          ctx.beginPath();
-          ctx.arc(-3.1, -0.2, 0.7, 0, TAU);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(-0.9, -0.2, 0.7, 0, TAU);
-          ctx.fill();
-          ctx.restore();
+        else if (p.activities.martian) {
+          const rx = rocket.dir > 0 ? -100 + rocket.t * (W + 200) : W + 100 - rocket.t * (W + 200);
+          const ry = rocket.by + Math.sin(rocket.t * TAU) * 20;
+          ctx.save(); ctx.translate(rx, ry); ctx.scale(2 * rocket.dir, 2);
+          drawMartianShip(ctx, worldT); ctx.restore();
         }
+      }
+      if (p.activities.rovers) {
+        const roverId = ROVER_PLANETS[Math.floor(worldT / 18) % ROVER_PLANETS.length];
+        const target = placed.find(body => body.id === roverId);
+        if (target) {
+          ctx.save(); ctx.translate(target.x, target.y);
+          drawRover(ctx, target.r, worldT); ctx.restore();
+        }
+      }
+      if (p.activities.station) {
+        const stationScale = W >= 900 ? Math.min(1, (W * .22) / 270) : .55;
+        ctx.save();
+        ctx.translate(W >= 900 ? W * .86 : W - 84, W >= 900 ? cy - 30 : 110);
+        ctx.scale(stationScale, stationScale);
+        drawStation(ctx, worldT, p.activities); ctx.restore();
       }
 
       /* ---- виньетка ---- */

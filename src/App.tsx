@@ -9,6 +9,8 @@ import { BODIES, PLANETS, SUN, fmtElapsed } from "./data/planets";
 import { BG_THEMES, nextTheme } from "./data/themes";
 import MessagesEditor, { DEFAULT_EARTH_MSG, DEFAULT_MARS_MSGS } from "./components/MessagesEditor";
 
+import { DEFAULT_ACTIVITIES, type ActivityKey } from "./lib/activitySettings";
+
 const ORDER = [SUN.id, ...PLANETS.map((p) => p.id)];
 
 export default function App() {
@@ -25,6 +27,8 @@ export default function App() {
   const [bgTheme, setBgTheme] = useState("deep");
   const [showUfo, setShowUfo] = useState(true);
   const [showAstro, setShowAstro] = useState(true);
+  const [activities, setActivities] = useState(DEFAULT_ACTIVITIES);
+  const toggleActivity = (key: ActivityKey) => setActivities(v => ({ ...v, [key]: !v[key] }));
   const [messagesOpen, setMessagesOpen] = useState(false);
   const [earthMsg, setEarthMsg] = useState(() => {
     try {
@@ -195,6 +199,7 @@ export default function App() {
               initialDays={elapsed}
               bgTheme={bgTheme}
               showUfo={showUfo}
+              activities={activities}
               showAstro={showAstro}
               earthMsg={earthMsg}
               marsMsgs={marsMsgs}
@@ -215,6 +220,7 @@ export default function App() {
               initialDays={elapsed}
               bgTheme={bgTheme}
               showUfo={showUfo}
+              activities={activities}
               showAstro={showAstro}
               earthMsg={earthMsg}
               marsMsgs={marsMsgs}
@@ -248,8 +254,10 @@ export default function App() {
               onCycleBg={() => setBgTheme((t) => nextTheme(t))}
               showUfo={showUfo}
               onToggleUfo={() => setShowUfo((v) => !v)}
+              activities={activities}
               showAstro={showAstro}
               onToggleAstro={() => setShowAstro((v) => !v)}
+              onToggleActivity={toggleActivity}
               onOpenMessages={() => setMessagesOpen(true)}
             />
           </div>

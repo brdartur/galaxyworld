@@ -6,6 +6,9 @@ import { PLANETS, SUN, SPIN_DAYS, type BodyData } from "../data/planets";
 import { getTexture } from "../lib/textures";
 import CosmicEvents3D, { DeepSpace } from "./CosmicEvents3D";
 
+import ActivityScene3D from "./ActivityScene3D";
+import { SURFACE_DURATION, type ActivitySettings } from "../lib/activitySettings";
+
 const TAU = Math.PI * 2;
 
 const clamp3 = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -22,6 +25,7 @@ function mulberry32(seed: number) {
 }
 
 interface SceneProps {
+  activities: ActivitySettings;
   playing: boolean;
   speed: number;
   showOrbits: boolean;
@@ -144,7 +148,7 @@ function bandTexture(): THREE.CanvasTexture {
 
 /* ---------- масштаб ---------- */
 export const orbitR3 = (au: number) => 7 + Math.sqrt(au) * 4.1;
-const planetR3 = (km: number) => 0.24 + Math.sqrt(km / 142984) * 1.5;
+const planetR3 = (km: number) => (0.24 + Math.sqrt(km / 142984) * 1.5) * 2;
 const SUN_R = 2.6;
 
 function OrbitRing({ r, tone }: { r: number; tone: "sel" | "hov" | "plain" }) {
@@ -215,6 +219,7 @@ function System(props: SceneProps) {
   const martianGrp = useRef<THREE.Group | null>(null);
   const martianArm = useRef<THREE.Group | null>(null);
   /* астронавт с ракетой */
+  const activityTime = useRef(0);
   const astroGrp = useRef<THREE.Group | null>(null);
   const astroFlame = useRef<THREE.Mesh | null>(null);
   const astroSM = useRef({
@@ -288,6 +293,7 @@ function System(props: SceneProps) {
     const dt = Math.min(dtRaw, 0.1);
     if (playingRef.current) sim.current += dt * speedRef.current;
     const days = sim.current;
+    activityTime.current += dt;
 
     for (let i = 0; i < PLANETS.length; i++) {
       const d = PLANETS[i];
@@ -473,7 +479,7 @@ function System(props: SceneProps) {
       const ang = d.angle0 + TAU * (days / d.periodDays);
       const r = orbitR3(d.distAU);
       const pr = planetR3(d.diameterKm);
-      const targetPos = new THREE.Vector3(Math.cos(ang) * r, pr + 2.5, Math.sin(ang) * r);
+      const targetPos = new THREE.Vector3(Math.cos(ang) * r, pr + 5, Math.sin(ang) * r);
       if (a.mode !== "travel") {
         a.pos.x = targetPos.x;
         a.pos.z = targetPos.z;
@@ -499,20 +505,12 @@ function System(props: SceneProps) {
           a.pos.y = groundY;
           a.mode = "explore";
           a.t = 0;
-          a.hold = 6 + Math.random() * 8;
+          a.hold = SURFACE_DURATION;
           a.flame = 0;
         }
       } else if (a.mode === "explore") {
         a.t += dt;
-        a.pos.y = pr + 1.8 + Math.sin(a.t * 2) * 0.15;
-        if (a.t >= a.hold) {
-          a.mode = "drill";
-          a.t = 0;
-          a.hold = 4 + Math.random() * 5;
-        }
-      } else if (a.mode === "drill") {
-        a.t += dt;
-        a.drill = 0.5 + 0.5 * Math.sin(a.t * 12);
+        a.pos.y = pr + 1.8;
         if (a.t >= a.hold) {
           a.mode = "depart";
           a.t = 0;
@@ -520,6 +518,7 @@ function System(props: SceneProps) {
       } else {
         a.t += dt;
         a.flame = Math.min(1, a.t * 1.5);
+        a.pos.y = pr + 1.8 + a.t * 3;
         if (a.t >= 1.2) {
           a.mode = "travel";
           a.flyT = 0;
@@ -845,7 +844,7 @@ function System(props: SceneProps) {
       </group>
 
       {/* астронавт на ракете */}
-      <group ref={astroGrp}>
+      <group ref={astroGrp} scale={2}>
         {/* корпус ракеты */}
         <mesh>
           <cylinderGeometry args={[0.25, 0.35, 1.4, 16]} />
@@ -900,6 +899,8 @@ function System(props: SceneProps) {
           <meshBasicMaterial color="#ff8a4d" transparent opacity={0.7} blending={THREE.AdditiveBlending} />
         </mesh>
       </group>
+
+      <ActivityScene3D settings={props.activities} showAstro={props.showAstro} mission={astroSM} planets={groups} time={activityTime} />
 
       {/* космические события: созвездия, чёрные дыры, метеоры, галактики... */}
       <CosmicEvents3D />
@@ -1188,7 +1189,7 @@ export default function SolarScene3D(props: SceneProps) {
 
         <System {...props} />
         <DeepSpace />
-        <OrbitControls enablePan={false} minDistance={9} maxDistance={620} enableDamping dampingFactor={0.06} />
+        <OrbitControls target={[0, -4, 0]} enablePan={false} minDistance={9} maxDistance={620} enableDamping dampingFactor={0.06} />
       </Canvas>
 
       <div className="pointer-events-none absolute bottom-20 left-1/2 z-10 -translate-x-1/2 rounded-md border border-line bg-space-900/75 px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] whitespace-nowrap text-faint backdrop-blur-sm lg:bottom-4">
