@@ -474,6 +474,10 @@ function System(props: SceneProps) {
       const r = orbitR3(d.distAU);
       const pr = planetR3(d.diameterKm);
       const targetPos = new THREE.Vector3(Math.cos(ang) * r, pr + 2.5, Math.sin(ang) * r);
+      if (a.mode !== "travel") {
+        a.pos.x = targetPos.x;
+        a.pos.z = targetPos.z;
+      }
       const eio = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
       if (a.mode === "travel") {
@@ -559,91 +563,6 @@ function System(props: SceneProps) {
       }
     }
 
-    /* астронавт: логика полёта между планетами */
-    if (astroGrp.current) {
-      astroGrp.current.visible = props.showAstro;
-    }
-    if (astroGrp.current && props.showAstro) {
-      const a = astroSM.current;
-      const fromP = PLANETS[a.targetIdx];
-      const toP = PLANETS[(a.targetIdx + 1) % PLANETS.length];
-      const afFrom = fromP.angle0 + TAU * (days / fromP.periodDays);
-      const rfFrom = orbitR3(fromP.distAU);
-      const pfFrom = planetR3(fromP.diameterKm);
-      const afTo = toP.angle0 + TAU * (days / toP.periodDays);
-      const rfTo = orbitR3(toP.distAU);
-      const pfTo = planetR3(toP.diameterKm);
-      const fromPos = new THREE.Vector3(Math.cos(afFrom) * rfFrom, 0, Math.sin(afFrom) * rfFrom);
-      const toPos = new THREE.Vector3(Math.cos(afTo) * rfTo, 0, Math.sin(afTo) * rfTo);
-
-      if (a.mode === "idle") {
-        // старт с первой планеты
-        a.mode = "toPlanet";
-        a.from.copy(fromPos);
-        a.to.copy(toPos);
-        a.t = 0;
-        a.flyT = 8 + Math.random() * 6;
-        a.pos.copy(a.from);
-        a.angle = 0;
-      } else if (a.mode === "toPlanet") {
-        a.t += dt / a.flyT;
-        if (a.t >= 1) {
-          a.mode = "landing";
-          a.t = 0;
-        } else {
-          const tt = a.t * a.t * (3 - 2 * a.t);
-          a.pos.lerpVectors(a.from, a.to, tt);
-          a.pos.y = Math.sin(a.t * Math.PI) * 4;
-          a.angle = Math.atan2(a.to.x - a.from.x, a.to.z - a.from.z);
-        }
-      } else if (a.mode === "landing") {
-        a.t += dt * 0.7;
-        if (a.t >= 1) {
-          a.mode = "surface";
-          a.hold = 12 + Math.random() * 10;
-          a.drill = 0;
-          a.t = 0;
-        } else {
-          const tt = a.t * a.t * (3 - 2 * a.t);
-          a.pos.lerpVectors(new THREE.Vector3(a.to.x, 4, a.to.z), a.to, tt);
-          a.pos.y = Math.max(0, a.pos.y);
-        }
-      } else if (a.mode === "surface") {
-        a.hold -= dt;
-        a.drill += dt * 0.4;
-        if (a.hold <= 0) {
-          a.mode = "takeoff";
-          a.t = 0;
-          a.from.copy(a.to);
-          const nextIdx = (a.targetIdx + 2) % PLANETS.length;
-          const nextP = PLANETS[nextIdx];
-          const anNext = nextP.angle0 + TAU * (days / nextP.periodDays);
-          const rnNext = orbitR3(nextP.distAU);
-          a.to.set(Math.cos(anNext) * rnNext, 0, Math.sin(anNext) * rnNext);
-          a.flyT = 10 + Math.random() * 8;
-        }
-      } else if (a.mode === "takeoff") {
-        a.t += dt * 0.5;
-        if (a.t >= 1) {
-          a.mode = "toPlanet";
-          a.targetIdx = (a.targetIdx + 1) % PLANETS.length;
-          a.t = 0;
-        } else {
-          a.pos.y = a.from.y + Math.sin(a.t * Math.PI) * 5;
-        }
-      }
-
-      astroGrp.current.position.copy(a.pos);
-      astroGrp.current.rotation.y = a.angle;
-      if (astroFlame.current) {
-        const burning = a.mode === "toPlanet" || a.mode === "landing" || a.mode === "takeoff";
-        astroFlame.current.visible = burning;
-        if (burning) {
-          const flicker = 0.7 + Math.random() * 0.6;
-          astroFlame.current.scale.setScalar(flicker);
-        }
-      }
-    }
   });
 
   return (
@@ -928,12 +847,12 @@ function System(props: SceneProps) {
       {/* астронавт на ракете */}
       <group ref={astroGrp}>
         {/* корпус ракеты */}
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <mesh>
           <cylinderGeometry args={[0.25, 0.35, 1.4, 16]} />
           <meshStandardMaterial color="#e8eef5" roughness={0.4} metalness={0.6} />
         </mesh>
         {/* нос */}
-        <mesh position={[0, 1.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <mesh position={[0, 1.1, 0]}>
           <coneGeometry args={[0.25, 0.7, 16]} />
           <meshStandardMaterial color="#d0dae8" roughness={0.3} metalness={0.7} />
         </mesh>
@@ -976,8 +895,8 @@ function System(props: SceneProps) {
           </mesh>
         </group>
         {/* пламя двигателя */}
-        <mesh ref={astroFlame} position={[0, -1.2, 0]} visible={false}>
-          <coneGeometry args={[0.3, 0.9, 12]} rotation={[Math.PI, 0, 0]} />
+        <mesh ref={astroFlame} position={[0, -1.2, 0]} rotation={[Math.PI, 0, 0]} visible={false}>
+          <coneGeometry args={[0.3, 0.9, 12]} />
           <meshBasicMaterial color="#ff8a4d" transparent opacity={0.7} blending={THREE.AdditiveBlending} />
         </mesh>
       </group>

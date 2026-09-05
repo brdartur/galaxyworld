@@ -339,7 +339,7 @@ interface Props {
   initialDays: number;
   bgTheme: string;
   showUfo: boolean;
-  showAstronaut: boolean;
+  showAstro: boolean;
   earthMsg: string;
   marsMsgs: string[];
   onSelect: (id: string | null) => void;
@@ -500,8 +500,6 @@ export default function SolarCanvas(props: Props) {
       flyT: number;      // 0..1 прогресс перелёта
       fromX: number;
       fromY: number;
-      toX: number;
-      toY: number;
       x: number;
       y: number;
       angle: number;     // угол наклона ракеты
@@ -516,8 +514,6 @@ export default function SolarCanvas(props: Props) {
       flyT: 0,
       fromX: 0,
       fromY: 0,
-      toX: 0,
-      toY: 0,
       x: -9999,
       y: -9999,
       angle: 0,
@@ -536,7 +532,6 @@ export default function SolarCanvas(props: Props) {
     let nextDisk = 6;
     let nextFlare = 1;
     let nextPulse = 2;
-    let nextAstroPick = 8; // следующее переключение цели астронавта
 
     const spawnComet = () => {
       let x: number, y: number;
@@ -657,47 +652,39 @@ export default function SolarCanvas(props: Props) {
     /* ================= астронавт: выбор цели, полёт, посадка, бурение ================= */
     const stepAstronaut = (d: number) => {
       const a = astronaut;
-      
-      // выбираем новую случайную планету-цель
-      if (a.mode === "idle" && nextAstroPick <= 0) {
+
+      // Первый полёт начинается сразу, чтобы включённый астронавт был виден.
+      if (a.mode === "idle") {
         a.mode = "toPlanet";
         a.targetIdx = Math.floor(Math.random() * PLANETS.length);
         a.flyT = 0;
-        a.fromX = a.x !== -9999 ? a.x : W / 2;
-        a.fromY = a.y !== -9999 ? a.y : H / 2;
+        a.fromX = cx;
+        a.fromY = cy - (placed.find((body) => body.id === SUN.id)?.r ?? 20) - 40;
         a.t = 0;
-        nextAstroPick = 8 + Math.random() * 6;
       }
-      nextAstroPick -= d;
+
+      // Используем те же экранные координаты и радиус, что и при отрисовке планеты.
+      const target = placed.find((body) => body.id === PLANETS[a.targetIdx].id);
+      if (!target) return;
+      const hoverY = target.y - target.r - 35;
+      const landY = target.y - target.r - 9;
 
       if (a.mode === "toPlanet") {
-        const target = PLANETS[a.targetIdx];
-        // вычисляем позицию цели
-        const { rAU, theta } = keplerPos(target, simRef.current.simDays);
-        const scale = Math.min(W, H) / 2.4;
-        const toX = W / 2 + Math.cos(theta) * rAU * scale;
-        const toY = H / 2 + Math.sin(theta) * rAU * scale;
-        const targetR = Math.max(6, Math.log(target.diameterKm) * 1.8);
-        
         a.flyT = Math.min(1, a.flyT + d / 3);
         const e = easeInOut(a.flyT);
         const arc = -50 * Math.sin(Math.PI * e);
-        a.x = a.fromX + (toX - a.fromX) * e;
-        a.y = a.fromY + (toY - a.fromY) * e + arc;
-        a.angle = Math.atan2(toY - a.fromY, toX - a.fromX) * 0.3;
-        
+        a.x = a.fromX + (target.x - a.fromX) * e;
+        a.y = a.fromY + (hoverY - a.fromY) * e + arc;
+        a.angle = Math.atan2(hoverY - a.fromY, target.x - a.fromX) * 0.3;
+
         if (a.flyT >= 1) {
           a.mode = "landing";
           a.t = 0;
-          a.toX = toX;
-          a.toY = toY;
         }
       } else if (a.mode === "landing") {
         a.t += d;
-        const hoverY = a.toY - 35;
-        const landY = a.toY - targetRadius(PLANETS[a.targetIdx]);
         const progress = Math.min(1, a.t / 2);
-        a.x = a.toX + Math.sin(progress * Math.PI) * 8;
+        a.x = target.x + Math.sin(progress * Math.PI) * 8;
         a.y = hoverY + (landY - hoverY) * progress;
         a.angle = 0;
         if (progress >= 1) {
@@ -707,34 +694,35 @@ export default function SolarCanvas(props: Props) {
           a.drill = 0;
         }
       } else if (a.mode === "surface") {
+        // После посадки следуем за планетой, пока она движется по орбите.
+        a.x = target.x;
+        a.y = landY;
         a.t += d;
         a.drill = Math.min(1, a.t / a.hold);
         if (a.t >= a.hold) {
           a.mode = "takeoff";
           a.t = 0;
           a.leaveT = 3;
+          a.fromX = a.x;
+          a.fromY = a.y;
         }
       } else if (a.mode === "takeoff") {
         a.t += d;
         const progress = Math.min(1, a.t / a.leaveT);
-        const startX = a.x;
-        const startY = a.y;
-        a.x = startX + Math.sin(progress * Math.PI) * 15;
-        a.y = startY - progress * 50;
+        // Отсчёт от точки взлёта, а не прибавление смещения каждый кадр.
+        a.x = a.fromX + Math.sin(progress * Math.PI) * 15;
+        a.y = a.fromY - progress * 50;
         a.angle = -0.2;
         if (progress >= 1) {
           a.mode = "toPlanet";
           a.flyT = 0;
           a.fromX = a.x;
           a.fromY = a.y;
-          a.targetIdx = Math.floor(Math.random() * PLANETS.length);
+          a.targetIdx = (a.targetIdx + 1 + Math.floor(Math.random() * (PLANETS.length - 1))) % PLANETS.length;
           a.t = 0;
         }
       }
     };
-
-    // вспомогательная функция для радиуса планеты
-    const targetRadius = (p: typeof PLANETS[0]) => Math.max(6, Math.log(p.diameterKm) * 1.8);
 
     /** пузырь с автопереносом строк; якорь — точка, к которой ведёт хвостик */
     const drawShipBubble = (
@@ -1068,7 +1056,7 @@ export default function SolarCanvas(props: Props) {
     /* ================= отрисовка астронавта с ракетой ================= */
     const drawAstronaut = () => {
       const a = astronaut;
-      if (!propsRef.current.showAstronaut) return;
+      if (!propsRef.current.showAstro) return;
       
       ctx.save();
       ctx.translate(a.x, a.y);
