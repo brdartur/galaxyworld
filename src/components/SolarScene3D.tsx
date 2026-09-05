@@ -489,6 +489,9 @@ function System(props: SceneProps) {
     }
 
     /* астронавт: логика полёта между планетами */
+    if (astroGrp.current) {
+      astroGrp.current.visible = props.showAstronaut;
+    }
     if (astroGrp.current && props.showAstronaut) {
       const a = astroSM.current;
       const fromP = PLANETS[a.targetIdx];
@@ -569,8 +572,6 @@ function System(props: SceneProps) {
           astroFlame.current.scale.setScalar(flicker);
         }
       }
-    } else if (astroGrp.current) {
-      astroGrp.current.visible = false;
     }
   });
 
