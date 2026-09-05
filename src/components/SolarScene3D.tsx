@@ -855,7 +855,7 @@ function System(props: SceneProps) {
       </group>
 
       {/* астронавт на корабле */}
-      <group ref={astroGrp} visible={false}>
+      <group ref={astroGrp} visible={props.showAstronaut}>
         {/* корпус ракеты */}
         <mesh rotation={[0, 0, Math.PI / 2]}>
           <cylinderGeometry args={[0.5, 0.7, 2.2, 16]} />
