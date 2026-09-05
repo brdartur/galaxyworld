@@ -339,6 +339,7 @@ interface Props {
   initialDays: number;
   bgTheme: string;
   showUfo: boolean;
+  showAstronaut: boolean;
   earthMsg: string;
   marsMsgs: string[];
   onSelect: (id: string | null) => void;
@@ -488,6 +489,40 @@ export default function SolarCanvas(props: Props) {
       y: -9999,
       greetIdx: 0,
     };
+    /* астронавт с кораблём: летает между планетами, приземляется, бурит, улетает */
+    type AstroMode = "idle" | "toPlanet" | "landing" | "surface" | "takeoff";
+    interface AstronautSM {
+      mode: AstroMode;
+      targetIdx: number; // индекс цели в PLANETS
+      t: number;         // время в текущей фазе
+      hold: number;      // длительность пребывания на поверхности (20-40 с)
+      drill: number;     // 0..1 прогресс бурения
+      flyT: number;      // 0..1 прогресс перелёта
+      fromX: number;
+      fromY: number;
+      toX: number;
+      toY: number;
+      x: number;
+      y: number;
+      angle: number;     // угол наклона ракеты
+      leaveT: number;    // время до взлёта
+    }
+    let astronaut: AstronautSM = {
+      mode: "idle",
+      targetIdx: 0,
+      t: 0,
+      hold: 20,
+      drill: 0,
+      flyT: 0,
+      fromX: 0,
+      fromY: 0,
+      toX: 0,
+      toY: 0,
+      x: -9999,
+      y: -9999,
+      angle: 0,
+      leaveT: 0,
+    };
     let sunFlares: { a: number; t0: number; dur: number }[] = [];
     let sunPulses: { t0: number }[] = [];
     let worldT = 0;
@@ -501,6 +536,7 @@ export default function SolarCanvas(props: Props) {
     let nextDisk = 6;
     let nextFlare = 1;
     let nextPulse = 2;
+    let nextAstroPick = 8; // следующее переключение цели астронавта
 
     const spawnComet = () => {
       let x: number, y: number;
@@ -617,6 +653,90 @@ export default function SolarCanvas(props: Props) {
         }
       }
     };
+
+    /* ================= астронавт: выбор цели, полёт, посадка, бурение ================= */
+    const stepAstronaut = (d: number) => {
+      const a = astronaut;
+      // если отключён — не обновляем логику
+      if (!propsRef.current.showAstronaut) return;
+      
+      // выбираем новую случайную планету-цель
+      if (a.mode === "idle" && nextAstroPick <= 0) {
+        a.mode = "toPlanet";
+        a.targetIdx = Math.floor(Math.random() * PLANETS.length);
+        a.flyT = 0;
+        a.fromX = a.x !== -9999 ? a.x : W / 2;
+        a.fromY = a.y !== -9999 ? a.y : H / 2;
+        a.t = 0;
+        nextAstroPick = 8 + Math.random() * 6;
+      }
+      nextAstroPick -= d;
+
+      if (a.mode === "toPlanet") {
+        const target = PLANETS[a.targetIdx];
+        // вычисляем позицию цели
+        const { rAU, theta } = keplerPos(target, simRef.current.simDays);
+        const scale = Math.min(W, H) / 2.4;
+        const toX = W / 2 + Math.cos(theta) * rAU * scale;
+        const toY = H / 2 + Math.sin(theta) * rAU * scale;
+        const targetR = Math.max(6, Math.log(target.diameterKm) * 1.8);
+        
+        a.flyT = Math.min(1, a.flyT + d / 3);
+        const e = easeInOut(a.flyT);
+        const arc = -50 * Math.sin(Math.PI * e);
+        a.x = a.fromX + (toX - a.fromX) * e;
+        a.y = a.fromY + (toY - a.fromY) * e + arc;
+        a.angle = Math.atan2(toY - a.fromY, toX - a.fromX) * 0.3;
+        
+        if (a.flyT >= 1) {
+          a.mode = "landing";
+          a.t = 0;
+          a.toX = toX;
+          a.toY = toY;
+        }
+      } else if (a.mode === "landing") {
+        a.t += d;
+        const hoverY = a.toY - 35;
+        const landY = a.toY - targetRadius(PLANETS[a.targetIdx]);
+        const progress = Math.min(1, a.t / 2);
+        a.x = a.toX + Math.sin(progress * Math.PI) * 8;
+        a.y = hoverY + (landY - hoverY) * progress;
+        a.angle = 0;
+        if (progress >= 1) {
+          a.mode = "surface";
+          a.t = 0;
+          a.hold = 20 + Math.random() * 20;
+          a.drill = 0;
+        }
+      } else if (a.mode === "surface") {
+        a.t += d;
+        a.drill = Math.min(1, a.t / a.hold);
+        if (a.t >= a.hold) {
+          a.mode = "takeoff";
+          a.t = 0;
+          a.leaveT = 3;
+        }
+      } else if (a.mode === "takeoff") {
+        a.t += d;
+        const progress = Math.min(1, a.t / a.leaveT);
+        const startX = a.x;
+        const startY = a.y;
+        a.x = startX + Math.sin(progress * Math.PI) * 15;
+        a.y = startY - progress * 50;
+        a.angle = -0.2;
+        if (progress >= 1) {
+          a.mode = "toPlanet";
+          a.flyT = 0;
+          a.fromX = a.x;
+          a.fromY = a.y;
+          a.targetIdx = Math.floor(Math.random() * PLANETS.length);
+          a.t = 0;
+        }
+      }
+    };
+
+    // вспомогательная функция для радиуса планеты
+    const targetRadius = (p: typeof PLANETS[0]) => Math.max(6, Math.log(p.diameterKm) * 1.8);
 
     /** пузырь с автопереносом строк; якорь — точка, к которой ведёт хвостик */
     const drawShipBubble = (
@@ -945,6 +1065,136 @@ export default function SolarCanvas(props: Props) {
         }
       }
       ctx.restore();
+    };
+
+    /* ================= отрисовка астронавта с ракетой ================= */
+    const drawAstronaut = () => {
+      const a = astronaut;
+      if (!propsRef.current.showAstronaut) return;
+      
+      ctx.save();
+      ctx.translate(a.x, a.y);
+      ctx.rotate(a.angle);
+      
+      // пламя двигателя (при полёте и взлёте)
+      if (a.mode === "toPlanet" || a.mode === "takeoff") {
+        const flicker = Math.sin(worldT * 20) * 3 + Math.cos(worldT * 13) * 2;
+        const flameGrad = ctx.createLinearGradient(-12, 0, -28 - flicker, 0);
+        flameGrad.addColorStop(0, "#fff7d0");
+        flameGrad.addColorStop(0.3, "#ffb547");
+        flameGrad.addColorStop(0.7, "#ff6b35");
+        flameGrad.addColorStop(1, "rgba(255,100,50,0)");
+        ctx.fillStyle = flameGrad;
+        ctx.beginPath();
+        ctx.moveTo(-10, -4);
+        ctx.lineTo(-28 - flicker, 0);
+        ctx.lineTo(-10, 4);
+        ctx.closePath();
+        ctx.fill();
+        
+        // внутреннее яркое ядро пламени
+        const coreFlicker = Math.sin(worldT * 25) * 2;
+        ctx.fillStyle = "rgba(255,255,255,0.8)";
+        ctx.beginPath();
+        ctx.moveTo(-10, -2);
+        ctx.lineTo(-18 - coreFlicker, 0);
+        ctx.lineTo(-10, 2);
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      // корпус ракеты
+      const rocketBody = ctx.createLinearGradient(-12, -5, -12, 5);
+      rocketBody.addColorStop(0, "#e8ecf5");
+      rocketBody.addColorStop(0.5, "#b8c5d8");
+      rocketBody.addColorStop(1, "#8a9ab0");
+      ctx.fillStyle = rocketBody;
+      ctx.beginPath();
+      ctx.moveTo(-12, -5);
+      ctx.lineTo(8, -5);
+      // носовой обтекатель
+      ctx.quadraticCurveTo(14, -5, 14, 0);
+      ctx.quadraticCurveTo(14, 5, 8, 5);
+      ctx.lineTo(-12, 5);
+      ctx.closePath();
+      ctx.fill();
+      
+      // тёмная полоса вдоль корпуса
+      ctx.strokeStyle = "rgba(60,70,90,0.4)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-10, 0);
+      ctx.lineTo(6, 0);
+      ctx.stroke();
+      
+      // иллюминатор с астронавтом внутри
+      const windowGrad = ctx.createRadialGradient(2, 0, 1, 2, 0, 4);
+      windowGrad.addColorStop(0, "rgba(180,220,255,0.9)");
+      windowGrad.addColorStop(0.7, "rgba(100,160,220,0.6)");
+      windowGrad.addColorStop(1, "rgba(60,100,160,0.3)");
+      ctx.fillStyle = windowGrad;
+      ctx.beginPath();
+      ctx.arc(2, 0, 3.5, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(50,70,100,0.6)";
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      
+      // силуэт астронавта в иллюминаторе
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.beginPath();
+      ctx.arc(2, -0.5, 1.8, 0, TAU); // шлем
+      ctx.fill();
+      ctx.fillStyle = "rgba(200,220,240,0.7)";
+      ctx.beginPath();
+      ctx.arc(2, 1.5, 1.2, 0, TAU); // скафандр
+      ctx.fill();
+      
+      // стабилизаторы
+      ctx.fillStyle = "#7a8898";
+      ctx.beginPath();
+      ctx.moveTo(-8, -5);
+      ctx.lineTo(-4, -7);
+      ctx.lineTo(0, -5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-8, 5);
+      ctx.lineTo(-4, 7);
+      ctx.lineTo(0, 5);
+      ctx.closePath();
+      ctx.fill();
+      
+      // антенна
+      ctx.strokeStyle = "#9aa8b8";
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(-6, -4);
+      ctx.lineTo(-8, -9);
+      ctx.stroke();
+      ctx.fillStyle = "#ff6b6b";
+      ctx.beginPath();
+      ctx.arc(-8, -9, 1, 0, TAU);
+      ctx.fill();
+      
+      // блик на корпусе
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(-8, -3);
+      ctx.lineTo(4, -3);
+      ctx.stroke();
+      
+      ctx.restore();
+      
+      // подпись статуса (опционально)
+      if (a.mode === "surface" && a.drill > 0.3) {
+        ctx.font = '500 9px "JetBrains Mono", monospace';
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(140,255,230,0.9)";
+        const drillText = a.drill >= 1 ? "ГОТОВО" : `БУРЕНИЕ ${Math.round(a.drill * 100)}%`;
+        ctx.fillText(drillText, a.x, a.y - 25);
+      }
     };
 
     /* ---- тематический фон (пререндер) ---- */
@@ -2353,6 +2603,10 @@ export default function SolarCanvas(props: Props) {
         stepUfo(dt);
         drawUfo();
       }
+
+      /* ---- астронавт с ракетой: полёты между планетами ---- */
+      stepAstronaut(dt);
+      drawAstronaut();
 
       /* ---- ракета с марсианином ---- */
       if (rocket) {
