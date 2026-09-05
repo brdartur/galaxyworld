@@ -657,8 +657,6 @@ export default function SolarCanvas(props: Props) {
     /* ================= астронавт: выбор цели, полёт, посадка, бурение ================= */
     const stepAstronaut = (d: number) => {
       const a = astronaut;
-      // если отключён — не обновляем логику
-      if (!propsRef.current.showAstronaut) return;
       
       // выбираем новую случайную планету-цель
       if (a.mode === "idle" && nextAstroPick <= 0) {
