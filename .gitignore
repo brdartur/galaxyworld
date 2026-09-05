@@ -7,22 +7,7 @@ dist/
 build/
 target/
 
-# Logs
-*.log
-
-# Environment variables
-.env
-.env.local
-*.env.*
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# Python specific
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -31,29 +16,43 @@ __pycache__/
 env/
 venv/
 .venv/
+.ENV
+.env
+.env.local
+.env.*
+.python-version
 pip-log.txt
 pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
+
+# Logs
 *.log
-.git/modules/
+
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Compiled and binary files
-*.o
-*.obj
-*.exe
-*.dll
-*.so
-*.a
-*.out
-*.class
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
 
 # Compressed files
 *.zip
@@ -75,13 +74,453 @@ Thumbs.db
 *.lz
 *.lzo
 
-# Testing
-.coverage
-htmlcov/
-.pytest_cache/
+# MyPy
 .mypy_cache/
+.dmypy.json
+dmypy.json
 
-# System files
+# PyTest
+.pytest_cache/
+
+# Environment specific
+.env.local
+.env.*
+
+# Git
+.git/
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn
+.yarn/
+yarn-error.log
+.yarn-integrity
+
+# Bower
+bower_components/
+
+# Grunt
+.grunt
+
+# Gulp
+gulp-cache/
+
+# Jspm
+jspm_packages/
+
+# Webpack
+webpack-stats.json
+
+# Ember
+.ember-cli
+.ember/
+tmp/
+dist/
+
+# Vue
+.vuepress/dist
+
+# Angular
+.angular/cache/
+
+# React
+.next/
+out/
+
+# Svelte
+.svelte-kit/
+
+# Rust
+target/
+
+# Java
+.gradle/
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+# C/C++
+*.o
+*.a
+*.so
+*.dll
+*.dylib
+*.exe
+*.out
+
+# Go
+*.exe
+*.test
+*.prof
+go.mod
+go.sum
+
+# Ruby
+*.gem
+*.rbc
+.rake_opts
+.bundle/
+vendor/bundle/
+vendor/cache/
+vendor/gems/
+vendor/ruby/
+
+# PHP
+vendor/
+
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+node_modules/
+
+# Meteor
+.meteor/local/
+
+# Babel
+.babel.cache.json
+
+# ESLint
+.eslintcache
+
+# Prettier
+.prettierignore
+
+# Docker
+.dockerenv
+
+# Kubernetes
+.kube/
+
+# Terraform
+.terraform/
+
+# Ansible
+.retry
+
+# Vagrant
+.vagrant/
+
+# Composer
+vendor/
+
+# Laravel
+bootstrap/cache/
+storage/
+!.gitkeep
+public/storage
+
+# Symfony
+var/cache/
+var/logs/
+var/sessions/
+
+# CakePHP
+logs/
+tmp/
+app/tmp/
+
+# Codeception
+_output/
+
+# Phalcon
+cache/
+
+# Yii
+runtime/
+web/assets/
+
+# Zend
+data/cache/
+.cache/
+
+# WordPress
+wp-content/cache/
+
+# Magento
+var/
+generated/
+pub/static/_cache/
+
+# Drupal
+sites/default/files/
+
+# Joomla
+administrator/logs/
+
+# PrestaShop
+app/cache/
+var/cache/
+
+# Shopware
+.var/
+.var/
+.files/
+.cache/
+
+# Typo3
+typo3temp/
+var/
+
+# Laravel Vapor
+vapor.yml
+
+# Serverless
+.serverless/
+
+# AWS SAM
+.sam/
+
+# Google Cloud
+.gcloud/
+.gcloudignore
+
+# Azure
+.azure/
+
+# Heroku
+.heroku/
+
+# Netlify
+.netlify/
+
+# Vercel
+.vercel/
+
+# Railway
+.railway/
+
+# Railway
+.railway/
+
+# Expo
+.expo/
+.expo-shared/
+
+# Ionic
+ionic.config.json
+
+# Capacitor
+capacitor.config.json
+
+# Cordova
+config.xml
+platforms/
+plugins/
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+ios/.symlinks/
+lib/generated/
+android/key.properties
+
+# Android
+*.apk
+*.ap_
+build/
+.externalNativeBuild
+.gradle
+local.properties
+captures/
+
+# iOS
+*.ipa
+*.dSYM.zip
+*.dSYM/
+build/
+DerivedData/
+*.mobileprovision
+*.xcconfig
+project.xcworkspace/
+xcuserdata/
+playground.xcworkspace/
+playground.xcodeproj/
+Pods/
+Podfile.lock
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+*.xcconfig
+xcuserdata/
+*.moved-aside
+*.orig
+*.rej
+*~
+*.log
 .DS_Store
-Thumbs.db
+.profile
+.sconsign.dblite
+.sconf_temp/
+.spyderproject
+.spyproject
+.wafpickle-N/
+coverage.xml
+nosetests.xml
+.tox/
+.coverage*/
+.cache/
+.nox/
+htmlcov/
+.process-compose/
+.process-compose.yaml
+.pytest_cache/
+.hypothesis/
+.eggs/
+.egg-info/
+.venv/
+venv/
+env/
+ENV/
+.ENV/
+.env
+.env.local
+.env.*
+.flaskenv
+.flaskenv.local
+.flaskenv.*
+requirements.txt
+Pipfile
+Pipfile.lock
+pyproject.toml
+poetry.lock
+*.pot
+*.po
+*.mo
+MANIFEST
+dist/
+build/
+*.egg-info/
+*.egg
+.installed.cfg
+*.egg-link
+*.noseids
+*.cover
+coverage.xml
+*.gcov
+*.lcov
+*.lst
+*.py,cover
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+*.fdb3-wal
+*.fdb3
+*.fdb-journal
+*.fdb-shm
+*.fdb-wal
+*.fdb3-journal
+*.fdb3-shm
+......
 ```
