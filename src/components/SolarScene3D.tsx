@@ -32,7 +32,7 @@ interface SceneProps {
   initialDays: number;
   bgTheme: string;
   showUfo: boolean;
-  showAstronaut: boolean;
+  showAstro: boolean;
   earthMsg: string;
   marsMsgs: string[];
   onSelect: (id: string | null) => void;
@@ -214,21 +214,20 @@ function System(props: SceneProps) {
   const ufoLadder = useRef<THREE.Group | null>(null);
   const martianGrp = useRef<THREE.Group | null>(null);
   const martianArm = useRef<THREE.Group | null>(null);
-  /* астронавт с кораблём */
+  /* астронавт с ракетой */
   const astroGrp = useRef<THREE.Group | null>(null);
-  const astroFlame = useRef<THREE.Group | null>(null);
+  const astroFlame = useRef<THREE.Mesh | null>(null);
   const astroSM = useRef({
-    mode: "idle" as "idle" | "toPlanet" | "landing" | "surface" | "takeoff",
-    targetIdx: 0,
+    mode: "travel" as "travel" | "land" | "explore" | "drill" | "depart",
     t: 0,
-    hold: 20,
+    hold: 8 + Math.random() * 12,
+    planetIdx: 0,
+    flame: 0,
     drill: 0,
+    pos: new THREE.Vector3(7, 10, 0),
+    target: new THREE.Vector3(),
     flyT: 0,
-    from: new THREE.Vector3(),
-    to: new THREE.Vector3(),
-    pos: new THREE.Vector3(),
-    angle: 0,
-    leaveT: 0,
+    from: new THREE.Vector3(7, 10, 0),
   });
   const ufoSM = useRef({
     mode: "earth" as "earth" | "toMars" | "mars" | "toEarth",
@@ -462,6 +461,78 @@ function System(props: SceneProps) {
             const onGround = u.martian >= 0.98;
             martianArm.current.rotation.z = onGround ? -1.2 + Math.sin(u.wave * 7) * 0.8 : -0.4;
           }
+        }
+      }
+    }
+
+    /* астронавт: летает между планетами, приземляется, исследует, бурит */
+    if (astroGrp.current) {
+      const a = astroSM.current;
+      const pIdx = a.planetIdx % PLANETS.length;
+      const d = PLANETS[pIdx];
+      const ang = d.angle0 + TAU * (days / d.periodDays);
+      const r = orbitR3(d.distAU);
+      const pr = planetR3(d.diameterKm);
+      const targetPos = new THREE.Vector3(Math.cos(ang) * r, pr + 2.5, Math.sin(ang) * r);
+      const eio = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+
+      if (a.mode === "travel") {
+        a.flyT = Math.min(1, a.flyT + dt / 3);
+        const k = eio(a.flyT);
+        a.pos.lerpVectors(a.from, targetPos, k);
+        a.flame = 0.6 + 0.4 * Math.sin(performance.now() / 50);
+        if (a.flyT >= 1) {
+          a.mode = "land";
+          a.t = 0;
+        }
+      } else if (a.mode === "land") {
+        const curY = a.pos.y;
+        const groundY = pr + 1.8;
+        if (curY > groundY) {
+          a.pos.y = curY - dt * 2.5;
+          a.flame = 0.8;
+        } else {
+          a.pos.y = groundY;
+          a.mode = "explore";
+          a.t = 0;
+          a.hold = 6 + Math.random() * 8;
+          a.flame = 0;
+        }
+      } else if (a.mode === "explore") {
+        a.t += dt;
+        a.pos.y = pr + 1.8 + Math.sin(a.t * 2) * 0.15;
+        if (a.t >= a.hold) {
+          a.mode = "drill";
+          a.t = 0;
+          a.hold = 4 + Math.random() * 5;
+        }
+      } else if (a.mode === "drill") {
+        a.t += dt;
+        a.drill = 0.5 + 0.5 * Math.sin(a.t * 12);
+        if (a.t >= a.hold) {
+          a.mode = "depart";
+          a.t = 0;
+        }
+      } else {
+        a.t += dt;
+        a.flame = Math.min(1, a.t * 1.5);
+        if (a.t >= 1.2) {
+          a.mode = "travel";
+          a.flyT = 0;
+          a.from.copy(a.pos);
+          a.planetIdx = (a.planetIdx + 1) % PLANETS.length;
+          a.t = 0;
+        }
+      }
+
+      astroGrp.current.position.copy(a.pos);
+      astroGrp.current.visible = props.showAstro;
+      if (astroFlame.current) {
+        const visible = a.flame > 0.02 && props.showAstro;
+        astroFlame.current.visible = visible;
+        if (visible) {
+          astroFlame.current.scale.set(1, 0.8 + a.flame * 1.2, 1);
+          (astroFlame.current.material as THREE.MeshBasicMaterial).opacity = 0.5 + a.flame * 0.4;
         }
       }
     }
@@ -854,60 +925,61 @@ function System(props: SceneProps) {
         )}
       </group>
 
-      {/* астронавт на корабле */}
-      <group ref={astroGrp} visible={props.showAstronaut}>
+      {/* астронавт на ракете */}
+      <group ref={astroGrp}>
         {/* корпус ракеты */}
-        <mesh rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.5, 0.7, 2.2, 16]} />
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.25, 0.35, 1.4, 16]} />
           <meshStandardMaterial color="#e8eef5" roughness={0.4} metalness={0.6} />
         </mesh>
         {/* нос */}
-        <mesh position={[1.3, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-          <coneGeometry args={[0.5, 0.9, 16]} />
-          <meshStandardMaterial color="#ff6b4a" roughness={0.3} metalness={0.5} />
+        <mesh position={[0, 1.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.25, 0.7, 16]} />
+          <meshStandardMaterial color="#d0dae8" roughness={0.3} metalness={0.7} />
         </mesh>
+        {/* плавники */}
+        {Array.from({ length: 4 }, (_, i) => {
+          const ang = (i / 4) * TAU;
+          return (
+            <mesh key={i} position={[Math.cos(ang) * 0.35, -0.4, Math.sin(ang) * 0.35]} rotation={[0.3, ang, 0]}>
+              <boxGeometry args={[0.04, 0.5, 0.25]} />
+              <meshStandardMaterial color="#9aa7c2" roughness={0.5} metalness={0.5} />
+            </mesh>
+          );
+        })}
         {/* иллюминатор */}
-        <mesh position={[0.3, 0.35, 0]} rotation={[0, 0, -Math.PI / 2]}>
-          <sphereGeometry args={[0.22, 16, 16]} />
-          <meshStandardMaterial color="#4ab8ff" roughness={0.1} metalness={0.8} emissive="#2a6f8f" emissiveIntensity={0.4} />
+        <mesh position={[0, 0.3, 0.26]}>
+          <sphereGeometry args={[0.12, 16, 16]} />
+          <meshStandardMaterial color="#4fc3f7" roughness={0.1} metalness={0.9} emissive="#1a5a7a" emissiveIntensity={0.3} />
         </mesh>
-        {/* стабилизаторы */}
-        <mesh position={[-0.8, 0.35, 0]} rotation={[0, 0, -Math.PI / 4]}>
-          <boxGeometry args={[0.5, 0.35, 0.04]} />
-          <meshStandardMaterial color="#c5d1e0" roughness={0.5} metalness={0.7} />
-        </mesh>
-        <mesh position={[-0.8, -0.35, 0]} rotation={[0, 0, Math.PI / 4]}>
-          <boxGeometry args={[0.5, 0.35, 0.04]} />
-          <meshStandardMaterial color="#c5d1e0" roughness={0.5} metalness={0.7} />
-        </mesh>
-        {/* пламя двигателя */}
-        <group ref={astroFlame} visible={false}>
-          <mesh position={[-1.4, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <coneGeometry args={[0.35, 0.9, 12]} />
-            <meshBasicMaterial color="#ff9500" transparent opacity={0.9} />
+        {/* астронавт в скафандре */}
+        <group position={[0, 0.8, 0.35]}>
+          {/* тело */}
+          <mesh>
+            <capsuleGeometry args={[0.12, 0.35, 8, 12]} />
+            <meshStandardMaterial color="#f5f5f5" roughness={0.5} />
           </mesh>
-          <mesh position={[-1.7, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <coneGeometry args={[0.2, 0.6, 12]} />
-            <meshBasicMaterial color="#ffd166" transparent opacity={0.8} />
+          {/* шлем */}
+          <mesh position={[0, 0.22, 0]}>
+            <sphereGeometry args={[0.14, 16, 16]} />
+            <meshStandardMaterial color="#f0f0f0" roughness={0.3} metalness={0.2} />
+          </mesh>
+          {/* визор */}
+          <mesh position={[0, 0.22, 0.12]}>
+            <sphereGeometry args={[0.09, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.35]} />
+            <meshStandardMaterial color="#1a2a3a" roughness={0.1} metalness={0.8} />
+          </mesh>
+          {/* рюкзак жизнеобеспечения */}
+          <mesh position={[0, 0.05, -0.12]}>
+            <boxGeometry args={[0.18, 0.25, 0.08]} />
+            <meshStandardMaterial color="#d0d8e0" roughness={0.4} />
           </mesh>
         </group>
-        {/* астронавт в скафандре (сидит в кабине) */}
-        <mesh position={[0.1, -0.15, 0.38]}>
-          <sphereGeometry args={[0.18, 12, 12]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.5} />
+        {/* пламя двигателя */}
+        <mesh ref={astroFlame} position={[0, -1.2, 0]} visible={false}>
+          <coneGeometry args={[0.3, 0.9, 12]} rotation={[Math.PI, 0, 0]} />
+          <meshBasicMaterial color="#ff8a4d" transparent opacity={0.7} blending={THREE.AdditiveBlending} />
         </mesh>
-        <mesh position={[0.1, -0.35, 0.38]}>
-          <capsuleGeometry args={[0.12, 0.25, 6, 8]} />
-          <meshStandardMaterial color="#f0f0f0" roughness={0.5} />
-        </mesh>
-        {/* пузырь с сообщением астронавта */}
-        {props.showAstronaut && astroSM.current.mode === surface && (
-          <Html center position={[0.8, 1.2, 0]} distanceFactor={38} zIndexRange={[30, 0]}>
-            <div className="pointer-events-none rounded-lg border border-[#6fb8ff]/60 bg-[rgba(8,16,28,0.88)] px-2.5 py-1.5 text-center font-mono text-[10px] font-semibold text-[#8fd4ff] backdrop-blur-sm">
-              {astroSM.current.drill > 3 ? "БУРЕНИЕ..." : astroSM.current.drill > 1 ? "ИЗУЧЕНИЕ..." : "ПОСАДКА ✓"}
-            </div>
-          </Html>
-        )}
       </group>
 
       {/* космические события: созвездия, чёрные дыры, метеоры, галактики... */}

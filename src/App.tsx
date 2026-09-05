@@ -24,7 +24,7 @@ export default function App() {
   const [view3d, setView3d] = useState(false);
   const [bgTheme, setBgTheme] = useState("deep");
   const [showUfo, setShowUfo] = useState(true);
-  const [showAstronaut, setShowAstronaut] = useState(true);
+  const [showAstro, setShowAstro] = useState(true);
   const [messagesOpen, setMessagesOpen] = useState(false);
   const [earthMsg, setEarthMsg] = useState(() => {
     try {
@@ -195,7 +195,7 @@ export default function App() {
               initialDays={elapsed}
               bgTheme={bgTheme}
               showUfo={showUfo}
-              showAstronaut={showAstronaut}
+              showAstro={showAstro}
               earthMsg={earthMsg}
               marsMsgs={marsMsgs}
               onSelect={(id) => id && inspect(id)}
@@ -215,7 +215,7 @@ export default function App() {
               initialDays={elapsed}
               bgTheme={bgTheme}
               showUfo={showUfo}
-              showAstronaut={showAstronaut}
+              showAstro={showAstro}
               earthMsg={earthMsg}
               marsMsgs={marsMsgs}
               onSelect={(id) => id && inspect(id)}
@@ -248,8 +248,8 @@ export default function App() {
               onCycleBg={() => setBgTheme((t) => nextTheme(t))}
               showUfo={showUfo}
               onToggleUfo={() => setShowUfo((v) => !v)}
-              showAstronaut={showAstronaut}
-              onToggleAstronaut={() => setShowAstronaut((v) => !v)}
+              showAstro={showAstro}
+              onToggleAstro={() => setShowAstro((v) => !v)}
               onOpenMessages={() => setMessagesOpen(true)}
             />
           </div>

@@ -18,8 +18,8 @@ interface Props {
   onCycleBg: () => void;
   showUfo: boolean;
   onToggleUfo: () => void;
-  showAstronaut: boolean;
-  onToggleAstronaut: () => void;
+  showAstro: boolean;
+  onToggleAstro: () => void;
   onOpenMessages: () => void;
 }
 
@@ -43,8 +43,8 @@ export default function ControlBar({
   onCycleBg,
   showUfo,
   onToggleUfo,
-  showAstronaut,
-  onToggleAstronaut,
+  showAstro,
+  onToggleAstro,
   onOpenMessages,
 }: Props) {
   const pos = Math.round((Math.log(Math.max(1, speed)) / LOG365) * 1000);
@@ -133,7 +133,7 @@ export default function ControlBar({
         <Toggle active={showOrbits} onClick={onToggleOrbits} label="ОРБИТЫ" />
         <Toggle active={showLabels} onClick={onToggleLabels} label="ИМЕНА" />
         <Toggle active={showUfo} onClick={onToggleUfo} label="НЛО" />
-        <Toggle active={showAstronaut} onClick={onToggleAstronaut} label="АСТРОНАВТ" />
+        <Toggle active={showAstro} onClick={onToggleAstro} label="АСТРОНАВТ" />
       </div>
 
       <div className="h-8 w-px bg-line" />
