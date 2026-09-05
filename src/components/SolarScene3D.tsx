@@ -561,9 +561,9 @@ function System(props: SceneProps) {
 
     /* астронавт: логика полёта между планетами */
     if (astroGrp.current) {
-      astroGrp.current.visible = props.showAstronaut;
+      astroGrp.current.visible = props.showAstro;
     }
-    if (astroGrp.current && props.showAstronaut) {
+    if (astroGrp.current && props.showAstro) {
       const a = astroSM.current;
       const fromP = PLANETS[a.targetIdx];
       const toP = PLANETS[(a.targetIdx + 1) % PLANETS.length];
