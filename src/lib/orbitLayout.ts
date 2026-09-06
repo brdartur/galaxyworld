@@ -1,6 +1,6 @@
 import { PLANETS } from "../data/planets";
 
-export const PLANET_RADIUS_2D = (km: number) => Math.min(11, Math.max(3.4, 3.1 + 6.4 * Math.sqrt(km / 142984))) * 6;
+export const PLANET_RADIUS_2D = (km: number) => Math.min(11, Math.max(3.4, 3.1 + 6.4 * Math.sqrt(km / 142984))) * 6 * .75;
 export const SUN_RADIUS_2D = 74;
 /** Fit circular orbital paths only. Planet and Sun radii never participate in a camera scale. */
 export function compactOrbits2D(width: number, height: number) {

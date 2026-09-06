@@ -54,7 +54,7 @@ export default function ActivityScene3D({ settings, showAstro, mission, planets,
   const roverRadius = useRef(64);
   const radius = (id: string) => {
     const p = PLANETS.find(p => p.id === id)!;
-    return (0.24 + Math.sqrt(p.diameterKm / 142984) * 1.5) * 2 * (planets.current[id]?.scale.x ?? 1);
+    return (0.24 + Math.sqrt(p.diameterKm / 142984) * 1.5) * 2 * .75 * (planets.current[id]?.scale.x ?? 1);
   };
   const onPlanet = (sprite: THREE.Sprite, id: string, drawingRadius: MutableRefObject<number>, minPixelScale: number) => {
     const planet = planets.current[id]; if (!planet) return false;

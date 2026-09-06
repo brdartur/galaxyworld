@@ -149,7 +149,7 @@ function bandTexture(): THREE.CanvasTexture {
 
 /* ---------- масштаб ---------- */
 export const orbitR3 = orbitRadius3D;
-const planetR3 = (km: number) => (0.24 + Math.sqrt(km / 142984) * 1.5) * 2;
+const planetR3 = (km: number) => (0.24 + Math.sqrt(km / 142984) * 1.5) * 2 * .75;
 const SUN_R = 2.6;
 
 function OrbitRing({ r, tone }: { r: number; tone: "sel" | "hov" | "plain" }) {

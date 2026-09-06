@@ -49,7 +49,7 @@ export default function DraggableStation({ settings }: { settings: ActivitySetti
     };
     raf = requestAnimationFrame(frame); return () => cancelAnimationFrame(raf);
   }, []);
-  const width = 380 * bounds.scale, height = 280 * bounds.scale;
+  const width = 380 * bounds.scale * .7, height = 280 * bounds.scale * .7;
   const rangeX = Math.max(0, bounds.width - width), rangeY = Math.max(0, bounds.height - height);
   const endDrag = (id: number) => {
     if (drag.current?.id !== id) return;
