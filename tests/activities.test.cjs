@@ -38,6 +38,7 @@ for(let t=0;t<180;t+=.5) {
   drawing.drawRover(ctx,50,t);
   drawing.drawSolarActivity(ctx,60,t);
   drawing.drawMartianShip(ctx,t);
+  drawing.drawLander(ctx,t,true,t%40<30);
   assert.equal(stack,0);
   calls.length=0;
 }
@@ -60,6 +61,30 @@ calls.length=0; drawing.drawSurfaceExplorer(ctx,40,15,settings.DEFAULT_ACTIVITIE
 assert.ok(calls.some(c=>c[0]==='fillText'&&c[1]==='БУРЕНИЕ'));
 console.log('PASS: mission phases, drawing coordinates over 180 seconds, rover targets, effect controls and tether');
 
+// Adjacent orbital lanes must retain body/ring clearance even at conjunction.
+const geometry=load(path.resolve('src/lib/orbitLayout.ts'));
+const bodies=load(path.resolve('src/data/planets.ts')).PLANETS;
+for(const aspect of [1,.62]) {
+  const radii=geometry.spacedOrbits(aspect);
+  let previous=0, previousExtent=geometry.SUN_RADIUS_2D;
+  bodies.forEach((p,i)=>{
+    const extent=geometry.PLANET_RADIUS_2D(p.diameterKm)*1.24*(p.ring?2.6:1);
+    assert.ok((radii[i]-previous)*aspect >= previousExtent+extent+23.999);
+    previous=radii[i];previousExtent=extent;
+  });
+}
+let previous=0,previousExtent=2.6;
+bodies.forEach(p=>{
+  const r=geometry.orbitRadius3D(p.distAU);
+  const extent=(.24+Math.sqrt(p.diameterKm/142984)*1.5)*2*1.28*(p.ring?2.6:1);
+  assert.ok(r>=2*(7+Math.sqrt(p.distAU)*4.1),'3D orbit at least doubled');
+  assert.ok(r-previous>=previousExtent+extent+1.999,'3D rings retain clearance');
+  previous=r;previousExtent=extent;
+});
+assert.ok(geometry.orbitRadius3D(2.1)>geometry.orbitRadius3D(1.52));
+assert.ok(geometry.orbitRadius3D(3.3)<geometry.orbitRadius3D(5.2));
+console.log('PASS: orbital clearance in both projections, doubled 3D distances and asteroid belt placement');
+
 // Exercise the actual 2D state update at multiple frame rates.
 let source=fs.readFileSync('src/components/SolarCanvas.tsx','utf8');
 const start=source.indexOf('    const stepAstronaut =');
@@ -69,7 +94,7 @@ for(const fps of [30,60,120]) {
   const PLANETS=Array.from({length:8},(_,i)=>({id:String(i)}));
   const placed=[{id:'sun',x:400,y:300,r:50},...PLANETS.map((p,i)=>({...p,x:100+i*70,y:350,r:15+i}))];
   const astronaut={mode:'idle',targetIdx:0,t:0,hold:40,drill:0,flyT:0,fromX:0,fromY:0,x:-9999,y:-9999,angle:0,leaveT:3};
-  const context=vm.createContext({PLANETS,placed,astronaut,SUN:{id:'sun'},cx:400,cy:300,SURFACE_DURATION:40,easeInOut:settings.smooth});
+  const context=vm.createContext({PLANETS,placed,astronaut,SUN:{id:'sun'},cx:400,cy:300,SURFACE_DURATION:40,easeInOut:settings.smooth,activityScale:()=>1});
   vm.runInContext(step,context);
   const modes=new Set(); let takeoffs=0;
   for(let frame=0;frame<150*fps;frame++) {

@@ -1,3 +1,4 @@
+import { orbitRadius3D } from "../lib/orbitLayout";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame } from "@react-three/fiber";
@@ -147,7 +148,7 @@ function bandTexture(): THREE.CanvasTexture {
 }
 
 /* ---------- масштаб ---------- */
-export const orbitR3 = (au: number) => 7 + Math.sqrt(au) * 4.1;
+export const orbitR3 = orbitRadius3D;
 const planetR3 = (km: number) => (0.24 + Math.sqrt(km / 142984) * 1.5) * 2;
 const SUN_R = 2.6;
 
@@ -845,65 +846,48 @@ function System(props: SceneProps) {
 
       {/* астронавт на ракете */}
       <group ref={astroGrp} scale={2}>
-        {/* корпус ракеты */}
-        <mesh>
-          <cylinderGeometry args={[0.25, 0.35, 1.4, 16]} />
-          <meshStandardMaterial color="#e8eef5" roughness={0.4} metalness={0.6} />
+        {/* Segmented pressure hull, insulated service stage and real landing struts. */}
+        <mesh position={[0,.25,0]}>
+          <cylinderGeometry args={[.28,.31,1.35,32]} />
+          <meshStandardMaterial color="#c7c9c0" roughness={.42} metalness={.68} />
         </mesh>
-        {/* нос */}
-        <mesh position={[0, 1.1, 0]}>
-          <coneGeometry args={[0.25, 0.7, 16]} />
-          <meshStandardMaterial color="#d0dae8" roughness={0.3} metalness={0.7} />
+        <mesh position={[0,1,0]} scale={[1,.8,1]}>
+          <sphereGeometry args={[.28,32,16,0,TAU,0,Math.PI/2]} />
+          <meshStandardMaterial color="#deddd0" roughness={.38} metalness={.6} />
         </mesh>
-        {/* плавники */}
-        {Array.from({ length: 4 }, (_, i) => {
-          const ang = (i / 4) * TAU;
-          return (
-            <mesh key={i} position={[Math.cos(ang) * 0.35, -0.4, Math.sin(ang) * 0.35]} rotation={[0.3, ang, 0]}>
-              <boxGeometry args={[0.04, 0.5, 0.25]} />
-              <meshStandardMaterial color="#9aa7c2" roughness={0.5} metalness={0.5} />
-            </mesh>
-          );
+        <mesh position={[0,-.58,0]}>
+          <cylinderGeometry args={[.31,.31,.35,24]} />
+          <meshStandardMaterial color="#9d8d65" roughness={.65} metalness={.65} />
+        </mesh>
+        {[-.75,-.4,0,.55,.88].map(y=><mesh key={y} position={[0,y,0]} rotation={[Math.PI/2,0,0]}>
+          <torusGeometry args={[.306,.012,8,32]} /><meshStandardMaterial color="#59686d" metalness={.8} roughness={.4} />
+        </mesh>)}
+        <mesh position={[0,-.82,0]}>
+          <cylinderGeometry args={[.11,.2,.2,24,1,true]} /><meshStandardMaterial color="#526168" metalness={.8} roughness={.5} side={THREE.DoubleSide} />
+        </mesh>
+        {[0,1,2,3].map(i=>{
+          const a=i*TAU/4, ca=Math.cos(a),sa=Math.sin(a);
+          return <group key={i}>
+            <Line points={[[ca*.27,-.3,sa*.27],[ca*.62,-.78,sa*.62],[ca*.65,-.9,sa*.65]]} color="#c1c8c2" lineWidth={2} />
+            <Line points={[[ca*.3,-.65,sa*.3],[ca*.62,-.78,sa*.62]]} color="#69797d" lineWidth={1} />
+            <mesh position={[ca*.65,-.9,sa*.65]}><cylinderGeometry args={[.11,.12,.025,16]} /><meshStandardMaterial color="#848f87" metalness={.65} /></mesh>
+          </group>;
         })}
-        {/* иллюминатор */}
-        <mesh position={[0, 0.3, 0.26]}>
-          <sphereGeometry args={[0.12, 16, 16]} />
-          <meshStandardMaterial color="#4fc3f7" roughness={0.1} metalness={0.9} emissive="#1a5a7a" emissiveIntensity={0.3} />
+        <mesh position={[0,.48,.284]}>
+          <torusGeometry args={[.13,.025,8,32]} /><meshStandardMaterial color="#6d7d80" metalness={.8} roughness={.25} />
         </mesh>
-        {/* астронавт в скафандре */}
-        <group position={[0, 0.8, 0.35]}>
-          {/* тело */}
-          <mesh>
-            <capsuleGeometry args={[0.12, 0.35, 8, 12]} />
-            <meshStandardMaterial color="#f5f5f5" roughness={0.5} />
-          </mesh>
-          {/* шлем */}
-          <mesh position={[0, 0.22, 0]}>
-            <sphereGeometry args={[0.14, 16, 16]} />
-            <meshStandardMaterial color="#f0f0f0" roughness={0.3} metalness={0.2} />
-          </mesh>
-          {/* визор */}
-          <mesh position={[0, 0.22, 0.12]}>
-            <sphereGeometry args={[0.09, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.35]} />
-            <meshStandardMaterial color="#1a2a3a" roughness={0.1} metalness={0.8} />
-          </mesh>
-          {/* рюкзак жизнеобеспечения */}
-          <mesh position={[0, 0.05, -0.12]}>
-            <boxGeometry args={[0.18, 0.25, 0.08]} />
-            <meshStandardMaterial color="#d0d8e0" roughness={0.4} />
-          </mesh>
-        </group>
+        <mesh position={[0,.48,.292]}><circleGeometry args={[.117,32]} /><meshStandardMaterial color="#203541" metalness={.8} roughness={.12} /></mesh>
         {/* пламя двигателя */}
         <mesh ref={astroFlame} position={[0, -1.2, 0]} rotation={[Math.PI, 0, 0]} visible={false}>
           <coneGeometry args={[0.3, 0.9, 12]} />
-          <meshBasicMaterial color="#ff8a4d" transparent opacity={0.7} blending={THREE.AdditiveBlending} />
+          <meshBasicMaterial color="#b3d1ef" transparent opacity={0.45} blending={THREE.AdditiveBlending} />
         </mesh>
       </group>
 
       <ActivityScene3D settings={props.activities} showAstro={props.showAstro} mission={astroSM} planets={groups} time={activityTime} />
 
       {/* космические события: созвездия, чёрные дыры, метеоры, галактики... */}
-      <CosmicEvents3D />
+      <CosmicEvents3D showDisks={props.activities.disks} />
     </group>
   );
 }
@@ -1154,7 +1138,7 @@ export default function SolarScene3D(props: SceneProps) {
 
   return (
     <div className="absolute inset-0">
-      <Canvas dpr={[1, 2]} camera={{ position: [0, 26, 46], fov: 44, far: 2600 }}>
+      <Canvas dpr={[1, 2]} camera={{ position: [0, 98, 156], fov: 44, far: 2600 }}>
         <color attach="background" args={[(THEME_CFG[props.bgTheme] ?? THEME_CFG.deep).bg]} />
         <fog
           attach="fog"
@@ -1189,7 +1173,7 @@ export default function SolarScene3D(props: SceneProps) {
 
         <System {...props} />
         <DeepSpace />
-        <OrbitControls target={[0, -4, 0]} enablePan={false} minDistance={9} maxDistance={620} enableDamping dampingFactor={0.06} />
+        <OrbitControls target={[0, -4, 0]} enablePan={true} minDistance={9} maxDistance={620} enableDamping dampingFactor={0.06} />
       </Canvas>
 
       <div className="pointer-events-none absolute bottom-20 left-1/2 z-10 -translate-x-1/2 rounded-md border border-line bg-space-900/75 px-3 py-1.5 font-mono text-[10px] tracking-[0.18em] whitespace-nowrap text-faint backdrop-blur-sm lg:bottom-4">

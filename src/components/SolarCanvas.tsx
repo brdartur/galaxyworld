@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { PLANET_RADIUS_2D, SUN_RADIUS_2D, spacedOrbits } from "../lib/orbitLayout";
+import { useEffect, useRef, useState } from "react";
 import { PLANETS, SUN, SPIN_DAYS, type BodyData } from "../data/planets";
 import { getTexture } from "../lib/textures";
 
 import { SURFACE_DURATION, ROVER_PLANETS, smooth, type ActivitySettings } from "../lib/activitySettings";
-import { drawSurfaceExplorer, drawRover, drawStation, drawSolarActivity, drawMartianShip } from "../lib/activityDrawing";
+import { drawSurfaceExplorer, drawRover, drawLander, drawSolarActivity, drawMartianShip } from "../lib/activityDrawing";
 
 const TAU = Math.PI * 2;
 
@@ -353,6 +354,13 @@ interface Props {
 }
 
 export default function SolarCanvas(props: Props) {
+  const [zoom, setZoom] = useState(1);
+  const cameraRef = useRef({ zoom: 1, panX: 0, panY: 0 });
+  const zoomBy = (factor: number) => {
+    cameraRef.current.zoom = clamp(cameraRef.current.zoom * factor, .65, 6);
+    setZoom(cameraRef.current.zoom);
+  };
+  const overview = () => { cameraRef.current = { zoom: 1, panX: 0, panY: 0 }; setZoom(1); };
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simRef = useRef({ simDays: 0 });
@@ -381,6 +389,8 @@ export default function SolarCanvas(props: Props) {
 
     let W = 0;
     let H = 0;
+    let controlsReserve = 155;
+    const controls = wrap.parentElement?.querySelector<HTMLElement>("[data-map-controls]");
     let stars: Star[] = [];
     let rocks: Rock[] = [];
     let milky: HTMLCanvasElement | null = null;
@@ -654,6 +664,7 @@ export default function SolarCanvas(props: Props) {
     };
 
     /* ================= астронавт: выбор цели, полёт, посадка, бурение ================= */
+    const activityScale = () => clamp(Math.min(W, H) / 900, .45, 1);
     const stepAstronaut = (d: number) => {
       const a = astronaut;
 
@@ -670,8 +681,8 @@ export default function SolarCanvas(props: Props) {
       // Используем те же экранные координаты и радиус, что и при отрисовке планеты.
       const target = placed.find((body) => body.id === PLANETS[a.targetIdx].id);
       if (!target) return;
-      const hoverY = target.y - target.r - 95;
-      const landY = target.y - target.r - 24;
+      const hoverY = target.y - target.r - 95 * activityScale();
+      const landY = target.y - target.r - 24 * activityScale();
 
       if (a.mode === "toPlanet") {
         a.flyT = Math.min(1, a.flyT + d / 3);
@@ -716,7 +727,7 @@ export default function SolarCanvas(props: Props) {
         const progress = Math.min(1, a.t / a.leaveT);
         // Отсчёт от точки взлёта, а не прибавление смещения каждый кадр.
         a.x = a.fromX + Math.sin(progress * Math.PI) * 15;
-        a.y = a.fromY - progress * 95;
+        a.y = a.fromY - progress * 95 * activityScale();
         a.angle = -Math.PI / 2;
         if (progress >= 1) {
           a.mode = "toPlanet";
@@ -739,8 +750,8 @@ export default function SolarCanvas(props: Props) {
       const msg = text.trim();
       if (!msg) return;
       ctx.save();
-      ctx.font = '600 24px "IBM Plex Sans", sans-serif';
-      const maxW = Math.min(400, W * 0.62);
+      ctx.font = `500 ${W < 640 ? 12 : 14}px "IBM Plex Sans", sans-serif`;
+      const maxW = Math.min(260, W * 0.56);
       // перенос по словам
       const words = msg.split(/\s+/);
       const lines: string[] = [];
@@ -753,12 +764,12 @@ export default function SolarCanvas(props: Props) {
         } else cur = test;
       }
       if (cur) lines.push(cur);
-      const lh = 31;
-      const padX = 20;
+      const lh = W < 640 ? 17 : 20;
+      const padX = 12;
       let wMax = 0;
       for (const l of lines) wMax = Math.max(wMax, ctx.measureText(l).width);
       const bw = wMax + padX * 2;
-      const bh = lines.length * lh + 26;
+      const bh = lines.length * lh + 18;
       // сторона — от края экрана, чтобы не налезть на корабль
       const toRight = ax < W / 2;
       const gapX = 42;
@@ -792,7 +803,7 @@ export default function SolarCanvas(props: Props) {
       ctx.fillStyle = opt.color;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 14 + lh / 2 + i * lh));
+      lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 9 + lh / 2 + i * lh));
       ctx.restore();
     };
 
@@ -1066,124 +1077,16 @@ export default function SolarCanvas(props: Props) {
       ctx.save();
       ctx.translate(a.x, a.y);
       ctx.rotate(a.angle);
-      ctx.scale(2, 2);
+      ctx.scale(2 * activityScale(), 2 * activityScale());
       
-      // пламя двигателя (при полёте и взлёте)
-      if (a.mode === "toPlanet" || a.mode === "takeoff" || a.mode === "landing") {
-        const flicker = Math.sin(worldT * 20) * 3 + Math.cos(worldT * 13) * 2;
-        const flameGrad = ctx.createLinearGradient(-12, 0, -28 - flicker, 0);
-        flameGrad.addColorStop(0, "#fff7d0");
-        flameGrad.addColorStop(0.3, "#ffb547");
-        flameGrad.addColorStop(0.7, "#ff6b35");
-        flameGrad.addColorStop(1, "rgba(255,100,50,0)");
-        ctx.fillStyle = flameGrad;
-        ctx.beginPath();
-        ctx.moveTo(-10, -4);
-        ctx.lineTo(-28 - flicker, 0);
-        ctx.lineTo(-10, 4);
-        ctx.closePath();
-        ctx.fill();
-        
-        // внутреннее яркое ядро пламени
-        const coreFlicker = Math.sin(worldT * 25) * 2;
-        ctx.fillStyle = "rgba(255,255,255,0.8)";
-        ctx.beginPath();
-        ctx.moveTo(-10, -2);
-        ctx.lineTo(-18 - coreFlicker, 0);
-        ctx.lineTo(-10, 2);
-        ctx.closePath();
-        ctx.fill();
-      }
-      
-      // корпус ракеты
-      const rocketBody = ctx.createLinearGradient(-12, -5, -12, 5);
-      rocketBody.addColorStop(0, "#e8ecf5");
-      rocketBody.addColorStop(0.5, "#b8c5d8");
-      rocketBody.addColorStop(1, "#8a9ab0");
-      ctx.fillStyle = rocketBody;
-      ctx.beginPath();
-      ctx.moveTo(-12, -5);
-      ctx.lineTo(8, -5);
-      // носовой обтекатель
-      ctx.quadraticCurveTo(14, -5, 14, 0);
-      ctx.quadraticCurveTo(14, 5, 8, 5);
-      ctx.lineTo(-12, 5);
-      ctx.closePath();
-      ctx.fill();
-      
-      // тёмная полоса вдоль корпуса
-      ctx.strokeStyle = "rgba(60,70,90,0.4)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(-10, 0);
-      ctx.lineTo(6, 0);
-      ctx.stroke();
-      
-      // иллюминатор с астронавтом внутри
-      const windowGrad = ctx.createRadialGradient(2, 0, 1, 2, 0, 4);
-      windowGrad.addColorStop(0, "rgba(180,220,255,0.9)");
-      windowGrad.addColorStop(0.7, "rgba(100,160,220,0.6)");
-      windowGrad.addColorStop(1, "rgba(60,100,160,0.3)");
-      ctx.fillStyle = windowGrad;
-      ctx.beginPath();
-      ctx.arc(2, 0, 3.5, 0, TAU);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(50,70,100,0.6)";
-      ctx.lineWidth = 0.8;
-      ctx.stroke();
-      
-      // силуэт астронавта в иллюминаторе
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.beginPath();
-      ctx.arc(2, -0.5, 1.8, 0, TAU); // шлем
-      ctx.fill();
-      ctx.fillStyle = "rgba(200,220,240,0.7)";
-      ctx.beginPath();
-      ctx.arc(2, 1.5, 1.2, 0, TAU); // скафандр
-      ctx.fill();
-      
-      // стабилизаторы
-      ctx.fillStyle = "#7a8898";
-      ctx.beginPath();
-      ctx.moveTo(-8, -5);
-      ctx.lineTo(-4, -7);
-      ctx.lineTo(0, -5);
-      ctx.closePath();
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(-8, 5);
-      ctx.lineTo(-4, 7);
-      ctx.lineTo(0, 5);
-      ctx.closePath();
-      ctx.fill();
-      
-      // антенна
-      ctx.strokeStyle = "#9aa8b8";
-      ctx.lineWidth = 0.6;
-      ctx.beginPath();
-      ctx.moveTo(-6, -4);
-      ctx.lineTo(-8, -9);
-      ctx.stroke();
-      ctx.fillStyle = "#ff6b6b";
-      ctx.beginPath();
-      ctx.arc(-8, -9, 1, 0, TAU);
-      ctx.fill();
-      
-      // блик на корпусе
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      ctx.moveTo(-8, -3);
-      ctx.lineTo(4, -3);
-      ctx.stroke();
-      
+      drawLander(ctx, worldT, a.mode === "toPlanet" || a.mode === "takeoff" || a.mode === "landing", a.mode === "surface" || a.mode === "landing");
       ctx.restore();
       
       if (a.mode === "surface") {
         const target = placed.find(body => body.id === PLANETS[a.targetIdx].id);
         if (target) {
           ctx.save(); ctx.translate(target.x, target.y);
-          drawSurfaceExplorer(ctx, target.r, a.t, propsRef.current.activities);
+          drawSurfaceExplorer(ctx, target.r, a.t, propsRef.current.activities, activityScale());
           ctx.restore();
         }
       }
@@ -1446,6 +1349,7 @@ export default function SolarCanvas(props: Props) {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       W = Math.max(320, rect.width);
       H = Math.max(300, rect.height);
+      controlsReserve = (controls?.getBoundingClientRect().height ?? 120) + 36;
       canvas.width = Math.round(W * dpr);
       canvas.height = Math.round(H * dpr);
       canvas.style.width = `${W}px`;
@@ -1474,11 +1378,8 @@ export default function SolarCanvas(props: Props) {
         warm: rr() > 0.72,
       }));
 
-      // центр приподнят: снизу — пульт управления, орбиты не закрываются
-      const topRes = H < 520 ? 86 : 105;
-      const bottomRes = clamp(H * 0.24, 145, 205) + 50;
-      cx = W >= 900 ? W * 0.43 : W / 2;
-      cy = topRes + (H - topRes - bottomRes) / 2;
+      cx = W >= 900 ? W * .52 : W / 2;
+      cy = (H - 135) / 2;
 
       /* фон под текущую тему — prerender */
       const diag = Math.hypot(W, H);
@@ -1529,28 +1430,18 @@ export default function SolarCanvas(props: Props) {
     };
 
     const layout = () => {
-      // та же геометрия, что и в resize(): снизу зарезервировано место под пульт
-      const topRes = H < 520 ? 86 : 105;
-      const bottomRes = clamp(H * 0.24, 145, 205) + 50;
-      const usableH = H - topRes - bottomRes;
-      const maxR = Math.min(W / 2 - 55, usableH / 2 - 4);
-      const sunR = clamp(Math.min(W, usableH) * 0.135, 45, 81);
-      const inner0 = sunR + 16;
-      const k = (maxR - inner0) / Math.sqrt(30.05);
-      const scale = clamp(Math.min(W, H) / 720, 0.7, 1.12);
-      const gap = clamp(k * 0.7, 14, 29);
-      let prev = inner0;
-      let radii = PLANETS.map((d) => {
-        const r = Math.max(inner0 + k * Math.sqrt(d.distAU), prev + gap);
-        prev = r;
-        return r;
-      });
-      const lastR = radii[radii.length - 1];
-      if (lastR > maxR) {
-        const f = (maxR - inner0) / (lastR - inner0);
-        radii = radii.map((r) => inner0 + (r - inner0) * f);
-      }
-      return { sunR, radii, scale };
+      const aspect = W >= 900 ? .62 : 1;
+      const world = spacedOrbits(aspect);
+      const edge = PLANET_RADIUS_2D(PLANETS[7].diameterKm) * 1.3;
+      const top = W < 640 ? 110 : 35, bottom = controlsReserve;
+      const left = W >= 900 ? 235 : 25, right = 35;
+      const centerX = left + (W - left - right) / 2;
+      const centerY = top + Math.max(80, H - top - bottom) / 2;
+      const fit = Math.min(Math.max(80, W-left-right)/2/(world[7]+edge), Math.max(80,H-top-bottom)/2/(world[7]*aspect+edge));
+      const scale = fit * cameraRef.current.zoom;
+      cx = centerX + cameraRef.current.panX;
+      cy = centerY + cameraRef.current.panY;
+      return { sunR: SUN_RADIUS_2D * scale, radii: world.map(r=>r*scale), scale, aspect };
     };
 
     const pick = (mx: number, my: number): string | null => {
@@ -1565,8 +1456,8 @@ export default function SolarCanvas(props: Props) {
 
     /** попадание по кольцу орбиты */
     const pickOrbit = (mx: number, my: number): string | null => {
-      const { radii } = layout();
-      const dist = Math.hypot(mx - cx, my - cy);
+      const { radii, aspect } = layout();
+      const dist = Math.hypot(mx - cx, (my - cy) / aspect);
       for (let i = 0; i < PLANETS.length; i++) {
         if (Math.abs(dist - radii[i]) < 9) return PLANETS[i].id;
       }
@@ -1607,10 +1498,16 @@ export default function SolarCanvas(props: Props) {
       return -1;
     };
 
+    let panDrag: { id: number; x: number; y: number; px: number; py: number } | null = null;
     const onMove = (e: PointerEvent) => {
       const rect = canvas.getBoundingClientRect();
       mouse.x = e.clientX - rect.left;
       mouse.y = e.clientY - rect.top;
+      if (panDrag) {
+        cameraRef.current.panX = panDrag.px + e.clientX - panDrag.x;
+        cameraRef.current.panY = panDrag.py + e.clientY - panDrag.y;
+        return;
+      }
       if (dragIdx >= 0) {
         const inst = cInsts[dragIdx];
         inst.x = mouse.x + dragOff.x;
@@ -1635,7 +1532,9 @@ export default function SolarCanvas(props: Props) {
       }
       canvas.style.cursor = "default";
     };
-    const onDown = () => {
+    const onDown = (e: PointerEvent) => {
+      if (!e.isPrimary || e.button !== 0) return;
+      onMove(e);
       const id = pick(mouse.x, mouse.y);
       if (id) {
         propsRef.current.onSelect(id);
@@ -1657,22 +1556,39 @@ export default function SolarCanvas(props: Props) {
         inst.glow = 1;
         canvas.style.cursor = "grabbing";
       } else {
-        ripples.push({ x: mouse.x, y: mouse.y, age: 0 });
+        panDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, px: cameraRef.current.panX, py: cameraRef.current.panY };
+        canvas.setPointerCapture(e.pointerId); canvas.style.cursor = 'grabbing';
       }
     };
     const onUp = () => {
+      if (panDrag && canvas.hasPointerCapture(panDrag.id)) canvas.releasePointerCapture(panDrag.id);
+      panDrag = null; canvas.style.cursor = 'default';
       if (dragIdx >= 0) {
         dragIdx = -1;
         canvas.style.cursor = hoverId ? "pointer" : "default";
       }
     };
 
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top;
+      layout();
+      const old = cameraRef.current.zoom;
+      const next = clamp(old * Math.exp(-e.deltaY * .0015), .65, 6), ratio = next / old;
+      cameraRef.current.panX += (x - cx) * (1 - ratio);
+      cameraRef.current.panY += (y - cy) * (1 - ratio);
+      cameraRef.current.zoom = next; setZoom(next);
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('pointercancel', onUp);
+    canvas.addEventListener('lostpointercapture', onUp);
     canvas.addEventListener("pointermove", onMove);
     canvas.addEventListener("pointerleave", onLeave);
     canvas.addEventListener("pointerdown", onDown);
     window.addEventListener("pointerup", onUp);
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
+    if (controls) ro.observe(controls);
     resize();
 
     const frame = (now: number) => {
@@ -1699,7 +1615,7 @@ export default function SolarCanvas(props: Props) {
       const t = now / 1000;
       worldT += dt;
 
-      const { sunR, radii, scale } = layout();
+      const { sunR, radii, scale, aspect } = layout();
       const m = Math.min(W, H);
       const lastOrbit = radii[radii.length - 1];
 
@@ -2154,7 +2070,7 @@ export default function SolarCanvas(props: Props) {
         const rr2 = radii[3] + (radii[4] - radii[3]) * rk.rf;
         ctx.globalAlpha = rk.alpha;
         ctx.fillStyle = rk.warm ? "#9b8570" : "#7e8698";
-        ctx.fillRect(cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2, rk.size, rk.size);
+        ctx.fillRect(cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2 * aspect, rk.size, rk.size);
       }
       ctx.globalAlpha = 1;
 
@@ -2165,7 +2081,7 @@ export default function SolarCanvas(props: Props) {
         const isSel = p.selectedId === d.id;
         const isHov = effHov === d.id;
         ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, TAU);
+        ctx.ellipse(cx, cy, r, r * aspect, 0, 0, TAU);
         if (isSel) {
           // закреплённое выделение: мягкое свечение + янтарная линия
           ctx.strokeStyle = "rgba(255,181,71,0.14)";
@@ -2191,20 +2107,20 @@ export default function SolarCanvas(props: Props) {
         const r = radii[i];
         const ang = d.angle0 + TAU * (simDays / d.periodDays);
         const x = cx + Math.cos(ang) * r;
-        const y = cy + Math.sin(ang) * r;
+        const y = cy + Math.sin(ang) * r * aspect;
         // плавное увеличение при наведении
         const hsTarget = effHov === d.id ? 1.24 : 1;
         const hsPrev = hoverScales.get(d.id) ?? 1;
         const hsCur = hsPrev + (hsTarget - hsPrev) * 0.16;
         hoverScales.set(d.id, hsCur);
-        const pr = clamp(3.1 + 6.4 * Math.sqrt(d.diameterKm / 142984), 3.4, 11) * 6 * scale * hsCur;
+        const pr = PLANET_RADIUS_2D(d.diameterKm) * scale * hsCur;
 
         // короткий малозаметный шлейф
         ctx.lineCap = "round";
         for (let sIdx = 1; sIdx <= 8; sIdx++) {
           const a1 = ang - sIdx * 0.016;
           ctx.beginPath();
-          ctx.arc(cx, cy, r, a1 - 0.017, a1);
+          ctx.ellipse(cx, cy, r, r * aspect, 0, a1 - 0.017, a1);
           ctx.strokeStyle = d.color;
           ctx.globalAlpha = 0.13 * (1 - sIdx / 9);
           ctx.lineWidth = Math.max(0.5, pr * 0.85 * (1 - sIdx / 9));
@@ -2541,7 +2457,7 @@ export default function SolarCanvas(props: Props) {
       }
 
       /* ---- протопланетные диски (зарождение планет) ---- */
-      const dscale = clamp(m / 800, 0.7, 1.2);
+      const dscale = 2 * clamp(m / 800, 0.7, 1.2);
       for (let i = disks.length - 1; i >= 0; i--) {
         const dk = disks[i];
         dk.age += dt;
@@ -2550,7 +2466,7 @@ export default function SolarCanvas(props: Props) {
           continue;
         }
         const env = Math.min(1, dk.age / 2.5, (dk.life - dk.age) / 3.5);
-        if (env <= 0) continue;
+        if (env <= 0 || !p.activities.disks) continue;
         // мягкое свечение
         const ng = ctx.createRadialGradient(dk.x, dk.y, 0, dk.x, dk.y, 46 * dscale);
         ng.addColorStop(0, `rgba(120,220,210,${(0.1 * env).toFixed(3)})`);
@@ -2573,11 +2489,12 @@ export default function SolarCanvas(props: Props) {
         for (let q = 0; q < 2; q++) {
           const a = t * (0.5 - q * 0.18) + dk.seed + q * 2.4;
           const rx = (15 + q * 7) * dscale;
-          const px = dk.x + Math.cos(a + rot) * rx;
-          const py = dk.y + Math.sin(a + rot) * rx * 0.32;
+          const localX = Math.cos(a) * rx, localY = Math.sin(a) * rx * .32;
+          const px = dk.x + localX * Math.cos(rot) - localY * Math.sin(rot);
+          const py = dk.y + localX * Math.sin(rot) + localY * Math.cos(rot);
           ctx.fillStyle = `rgba(255,220,160,${(0.8 * env).toFixed(3)})`;
           ctx.beginPath();
-          ctx.arc(px, py, 1.6, 0, TAU);
+          ctx.arc(px, py, 3.2, 0, TAU);
           ctx.fill();
         }
         // ядро
@@ -2621,17 +2538,9 @@ export default function SolarCanvas(props: Props) {
         const target = placed.find(body => body.id === roverId);
         if (target) {
           ctx.save(); ctx.translate(target.x, target.y);
-          drawRover(ctx, target.r, worldT); ctx.restore();
+          drawRover(ctx, target.r, worldT, activityScale()); ctx.restore();
         }
       }
-      if (p.activities.station) {
-        const stationScale = W >= 900 ? Math.min(1, (W * .22) / 270) : .55;
-        ctx.save();
-        ctx.translate(W >= 900 ? W * .86 : W - 84, W >= 900 ? cy - 30 : 110);
-        ctx.scale(stationScale, stationScale);
-        drawStation(ctx, worldT, p.activities); ctx.restore();
-      }
-
       /* ---- виньетка ---- */
       const vg = ctx.createRadialGradient(W / 2, H / 2, m * 0.35, W / 2, H / 2, Math.max(W, H) * 0.72);
       vg.addColorStop(0, "rgba(3,5,12,0)");
@@ -2650,6 +2559,9 @@ export default function SolarCanvas(props: Props) {
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('pointercancel', onUp);
+      canvas.removeEventListener('lostpointercapture', onUp);
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerleave", onLeave);
       canvas.removeEventListener("pointerdown", onDown);
@@ -2659,7 +2571,14 @@ export default function SolarCanvas(props: Props) {
 
   return (
     <div ref={wrapRef} className="absolute inset-0">
-      <canvas ref={canvasRef} className="block" aria-label="Карта Солнечной системы" />
+      <div className="absolute right-3 top-12 z-20 flex items-center gap-1 rounded-lg border border-line bg-space-900/90 p-1 text-dim md:top-3" aria-label="Масштаб карты">
+        <button type="button" aria-label="Уменьшить карту" title="Уменьшить" className="h-8 w-8 rounded hover:bg-white/10" onClick={()=>zoomBy(1/1.25)}>−</button>
+        <span className="w-12 text-center font-mono text-[10px]">{Math.round(zoom*100)}%</span>
+        <button type="button" aria-label="Увеличить карту" title="Увеличить" className="h-8 w-8 rounded hover:bg-white/10" onClick={()=>zoomBy(1.25)}>+</button>
+        <button type="button" title="Рассмотреть планеты и работу астронавта" className="h-8 rounded px-2 font-mono text-[10px] hover:bg-white/10" onClick={()=>{ cameraRef.current.zoom = 3; setZoom(3); }}>КРУПНО</button>
+        <button type="button" className="h-8 rounded px-2 font-mono text-[10px] hover:bg-white/10" onClick={overview}>ВСЯ СИСТЕМА</button>
+      </div>
+      <canvas ref={canvasRef} className="block touch-none" aria-label="Карта Солнечной системы" />
     </div>
   );
 }

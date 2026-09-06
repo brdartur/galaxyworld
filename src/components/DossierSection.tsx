@@ -89,7 +89,7 @@ export default function DossierSection({ onSelect }: Props) {
 
         <Reveal delay={120}>
           <p className="mt-6 font-mono text-[10px] tracking-[0.14em] text-faint">
-            ИСТОЧНИК: NASA PLANETARY FACT SHEET · ЗНАЧЕНИЯ ОКРУГЛЕНЫ · РАССТОЯНИЯ НА КАРТЕ СЖАТЫ ПО √-ШКАЛЕ ДЛЯ НАГЛЯДНОСТИ
+            ИСТОЧНИК: NASA PLANETARY FACT SHEET · ЗНАЧЕНИЯ ОКРУГЛЕНЫ · МАСШТАБ ОРБИТ УСЛОВНЫЙ, С УЧЁТОМ РАЗМЕРОВ ПЛАНЕТ
           </p>
         </Reveal>
       </div>

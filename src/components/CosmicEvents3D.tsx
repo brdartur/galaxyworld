@@ -343,7 +343,7 @@ function Novae() {
 }
 
 /* ================= ПРОТОПЛАНЕТНЫЙ ДИСК ================= */
-function ProtoDisk() {
+function ProtoDisk({ enabled }: { enabled: boolean }) {
   const grp = useRef<THREE.Group>(null);
   const inner = useRef<THREE.Group>(null);
   const state = useRef({ active: false, age: 0, life: 26 });
@@ -387,12 +387,12 @@ function ProtoDisk() {
       g.visible = false;
       return;
     }
-    g.visible = true;
+    g.visible = enabled;
     if (inner.current) inner.current.rotation.y += dt * 0.25;
   });
 
   return (
-    <group ref={grp} visible={false}>
+    <group ref={grp} visible={false} scale={2}>
       <group ref={inner}>
         <points geometry={geo}>
           <pointsMaterial color="#ffd9a0" size={0.5} sizeAttenuation transparent opacity={0.75} blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
@@ -403,125 +403,6 @@ function ProtoDisk() {
         <meshBasicMaterial color="#8a6f4d" transparent opacity={0.14} side={THREE.DoubleSide} depthWrite={false} fog={false} />
       </mesh>
       <FarLabel text="ПРОТОПЛАНЕТНЫЙ ДИСК" sub="здесь рождаются планеты" />
-    </group>
-  );
-}
-
-/* ================= РАКЕТА С МАРСИАНИНОМ ================= */
-function Rocket() {
-  const grp = useRef<THREE.Group>(null);
-  const flame = useRef<THREE.Mesh>(null);
-  const st = useRef({ active: false, t: 0, dir: 1, y: 34, z: 18 });
-  const next = useRef(13);
-
-  useFrame(({ clock }, dtRaw) => {
-    const dt = Math.min(dtRaw, 0.1);
-    const g = grp.current;
-    if (!g) return;
-    const s = st.current;
-    if (!s.active) {
-      next.current -= dt;
-      if (next.current <= 0) {
-        s.active = true;
-        s.t = 0;
-        s.dir = Math.random() < 0.5 ? 1 : -1;
-        s.y = 26 + Math.random() * 26;
-        s.z = (Math.random() - 0.5) * 60;
-        g.visible = true;
-      } else {
-        g.visible = false;
-        return;
-      }
-    }
-    s.t += dt / 30;
-    if (s.t >= 1) {
-      s.active = false;
-      g.visible = false;
-      next.current = 22 + Math.random() * 14;
-      return;
-    }
-    const x = s.dir * (-260 + s.t * 520);
-    g.position.set(x, s.y + Math.sin(s.t * Math.PI * 2.4) * 4, s.z);
-    g.rotation.set(0, s.dir > 0 ? 0 : Math.PI, Math.sin(clock.elapsedTime * 1.6) * 0.06);
-    if (flame.current) flame.current.scale.set(1, 0.7 + Math.abs(Math.sin(clock.elapsedTime * 26)) * 0.65, 1);
-  });
-
-  const flameGlow = useMemo(() => glowTex("rgba(255,255,255,0.9)"), []);
-  return (
-    <group ref={grp} visible={false}>
-      {/* корпус */}
-      <mesh rotation={[0, 0, -Math.PI / 2]}>
-        <cylinderGeometry args={[0.55, 0.58, 3.4, 20]} />
-        <meshStandardMaterial color="#e9eef7" roughness={0.45} metalness={0.35} />
-      </mesh>
-      {/* нижняя ступень */}
-      <mesh position={[-1.35, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-        <cylinderGeometry args={[0.58, 0.62, 0.9, 20]} />
-        <meshStandardMaterial color="#a8b4ca" roughness={0.5} metalness={0.4} />
-      </mesh>
-      {/* красные полосы */}
-      {[-0.55, 0.9].map((px) => (
-        <mesh key={px} position={[px, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
-          <torusGeometry args={[0.585, 0.045, 8, 28]} />
-          <meshStandardMaterial color="#e04a3f" roughness={0.5} metalness={0.2} />
-        </mesh>
-      ))}
-      {/* носовой обтекатель */}
-      <mesh position={[2.25, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-        <coneGeometry args={[0.55, 1.1, 20]} />
-        <meshStandardMaterial color="#e04a3f" roughness={0.4} metalness={0.3} />
-      </mesh>
-      <mesh position={[2.86, 0, 0]}>
-        <sphereGeometry args={[0.08, 8, 8]} />
-        <meshStandardMaterial color="#ffd9d0" roughness={0.3} metalness={0.6} />
-      </mesh>
-      {/* стабилизаторы */}
-      {[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((a) => (
-        <group key={a} rotation={[a, 0, 0]}>
-          <mesh position={[-1.75, 0.82, 0]} rotation={[0, 0, 0.5]}>
-            <boxGeometry args={[0.95, 0.75, 0.06]} />
-            <meshStandardMaterial color="#d84a3f" roughness={0.5} metalness={0.2} />
-          </mesh>
-        </group>
-      ))}
-      {/* сопло двигателя */}
-      <mesh position={[-1.95, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <coneGeometry args={[0.34, 0.5, 14]} />
-        <meshStandardMaterial color="#3c4250" roughness={0.35} metalness={0.8} />
-      </mesh>
-      {/* пламя: внешний и внутренний конусы */}
-      <mesh ref={flame} position={[-2.75, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <coneGeometry args={[0.42, 1.9, 12]} />
-        <meshBasicMaterial color="#ff9a3d" transparent opacity={0.8} blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
-      </mesh>
-      <mesh position={[-2.55, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <coneGeometry args={[0.2, 1.15, 10]} />
-        <meshBasicMaterial color="#fff3c4" transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
-      </mesh>
-      {/* свечение выхлопа */}
-      <sprite position={[-3.1, 0, 0]} scale={[2.8, 2.8, 1]}>
-        <spriteMaterial map={flameGlow} color="#ffb547" transparent opacity={0.35} blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
-      </sprite>
-      {/* иллюминаторы */}
-      {[0.15, -0.45].map((px) => (
-        <mesh key={px} position={[px, 0.42, 0.36]}>
-          <sphereGeometry args={[0.16, 10, 10]} />
-          <meshStandardMaterial color="#9fd8ff" emissive="#2a6a9a" emissiveIntensity={0.6} roughness={0.2} metalness={0.4} />
-        </mesh>
-      ))}
-      {/* иллюминатор с марсианином */}
-      <mesh position={[0.85, 0.4, 0.34]}>
-        <sphereGeometry args={[0.21, 12, 12]} />
-        <meshBasicMaterial color="#6fe08a" fog={false} />
-      </mesh>
-      <mesh position={[0.79, 0.46, 0.5]}>
-        <sphereGeometry args={[0.045, 6, 6]} />
-        <meshBasicMaterial color="#08220f" fog={false} />
-      </mesh>
-      <mesh position={[0.92, 0.46, 0.5]}>
-        <sphereGeometry args={[0.045, 6, 6]} />
-        <meshBasicMaterial color="#08220f" fog={false} />
-      </mesh>
     </group>
   );
 }
@@ -784,7 +665,7 @@ export function DeepSpace() {
 }
 
 /* ================= СБОРКА ================= */
-export default function CosmicEvents3D() {
+export default function CosmicEvents3D({ showDisks }: { showDisks: boolean }) {
   const bh = useRef<BHoleD | null>(null);
   return (
     <group>
@@ -792,8 +673,7 @@ export default function CosmicEvents3D() {
       <Meteors />
       <BlackHole bh={bh} />
       <Novae />
-      <ProtoDisk />
-      <Rocket />
+      <ProtoDisk enabled={showDisks} />
     </group>
   );
 }

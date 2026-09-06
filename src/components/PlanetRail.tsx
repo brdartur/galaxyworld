@@ -12,8 +12,8 @@ const ALL: BodyData[] = [SUN, ...PLANETS];
 /** Вертикальный список объектов — левый край карты (md+) */
 export function PlanetRail({ selectedId, hoverId, onSelect, onHover }: Props) {
   return (
-    <nav className="pointer-events-auto absolute top-1/2 left-5 hidden -translate-y-1/2 flex-col gap-1.5 md:flex" aria-label="Объекты системы">
-      <span className="mb-3 pl-3 font-mono text-[18px] tracking-[0.24em] text-faint">ОБЪЕКТЫ</span>
+    <nav className="pointer-events-auto absolute top-16 bottom-44 left-4 hidden max-w-[212px] flex-col gap-1 overflow-y-auto md:flex" aria-label="Объекты системы">
+      <span className="mb-2 pl-3 font-mono text-[11px] tracking-[0.24em] text-faint">ОБЪЕКТЫ</span>
       {ALL.map((b) => {
         const sel = selectedId === b.id;
         const hov = hoverId === b.id;
@@ -35,10 +35,10 @@ export function PlanetRail({ selectedId, hoverId, onSelect, onHover }: Props) {
               className="h-4 w-4 shrink-0 rounded-full transition-transform duration-200 group-hover:scale-125"
               style={{ background: b.color, boxShadow: sel || hov ? `0 0 12px ${b.color}` : "none" }}
             />
-            <span className={`w-[142px] text-[25px] leading-none font-semibold transition-colors ${sel ? "text-amber" : hov ? "text-teal" : "text-dim group-hover:text-ink"}`}>
+            <span className={`w-[82px] text-[16px] leading-none font-semibold transition-colors ${sel ? "text-amber" : hov ? "text-teal" : "text-dim group-hover:text-ink"}`}>
               {b.name}
             </span>
-            <span className="font-mono text-[19px] text-faint">
+            <span className="whitespace-nowrap font-mono text-[10px] text-faint">
               {b.id === "sun" ? "★" : `${b.distAU.toLocaleString("ru-RU")} а.е.`}
             </span>
           </button>

@@ -144,23 +144,23 @@ function sunGen(w: number, h: number): TexData {
   const spots = Array.from({ length: 7 }, () => ({
     u: rnd(),
     v: 0.2 + rnd() * 0.6,
-    r: 0.012 + Math.pow(rnd(), 2) * 0.03,
+    r: 0.003 + Math.pow(rnd(), 2) * 0.008,
   }));
   return bake(w, h, (u, v) => {
     const lat = 0.5 - v;
     // мелкая зернистость фотосферы
-    const [cx1, cy1, cz1] = cyl(u, lat, 30);
+    const [cx1, cy1, cz1] = cyl(u, lat, 85);
     const gran = n01(nFine(cx1, cy1, cz1));
     // ячейки супергрануляции с warping
     const [wx, wy, wz] = cyl(u, lat, 6);
     const wx2 = wx + nSpotW(wx * 2, wy * 2, wz * 2) * 0.9;
     const wy2 = wy + nSpotW(wy * 2, wz * 2, wx * 2) * 0.9;
     const cell = Math.abs(nCell(wx2, wy2, wz)); // ridged -> сетка ярких ячеек
-    let m = 0.86 + (gran - 0.5) * 0.22 + cell * 0.16;
-    // жёлто-золотая база (заметно желтее, чем раньше)
+    const m = 0.9 + (gran - 0.5) * 0.18 + cell * 0.06;
+    // Мелкая грануляция яркой фотосферы, без крупных тёмных «кратеров».
     let r = 255 * m;
-    let g = 212 * m;
-    let b = 104 * m * m;
+    let g = 221 * m;
+    let b = 137 * m * m;
     // горячие факелы
     const hot = smoothstep(0.62, 0.85, gran + cell * 0.3);
     r += hot * 6;
@@ -171,7 +171,8 @@ function sunGen(w: number, h: number): TexData {
       let du = u - s.u;
       du -= Math.round(du);
       const dd = Math.hypot(du * 1.6, v - s.v);
-      const t = dd / s.r;
+      const irregular = dd < s.r * 3 ? nSpotW(cx1 * 2, cy1 * 2, cz1 * 2) * .45 : 0;
+      const t = dd / s.r + irregular;
       if (t < 2.2) {
         const umbra = smoothstep(1, 0.45, t);
         const pen = smoothstep(2.2, 1, t) * 0.55;

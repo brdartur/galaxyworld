@@ -8,13 +8,14 @@ export const ACTIVITY_LABELS = {
   stationRepair: "РЕМОНТ СТАНЦИИ",
   spacewalk: "ВЫХОД В КОСМОС",
   martian: "РАКЕТА МАРСИАНИНА",
+  disks: "ПРОТОДИСКИ",
 } as const;
 
 export type ActivityKey = keyof typeof ACTIVITY_LABELS;
 export type ActivitySettings = Record<ActivityKey, boolean>;
 export const DEFAULT_ACTIVITIES: ActivitySettings = {
   drilling: true, research: true, rovers: true, solar: true,
-  station: true, stationCrew: true, stationRepair: true, spacewalk: true, martian: true,
+  station: true, stationCrew: true, stationRepair: true, spacewalk: true, martian: true, disks: true,
 };
 export const SURFACE_DURATION = 40;
 export const ROVER_PLANETS = ["jupiter", "saturn", "uranus", "neptune"];

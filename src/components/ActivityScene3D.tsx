@@ -3,7 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { PLANETS } from "../data/planets";
 import { ROVER_PLANETS, type ActivitySettings } from "../lib/activitySettings";
-import { drawMartianShip, drawRover, drawSolarActivity, drawStation, drawSurfaceExplorer } from "../lib/activityDrawing";
+import { drawMartianShip, drawRover, drawSolarActivity, drawSurfaceExplorer } from "../lib/activityDrawing";
 
 interface Mission { mode: string; planetIdx: number; t: number }
 interface Props {
@@ -73,22 +73,13 @@ export default function ActivityScene3D({ settings, showAstro, mission, planets,
   const roverId = () => ROVER_PLANETS[Math.floor(time.current / 18) % ROVER_PLANETS.length];
   return <>
     <ActivitySprite draw={c => drawSurfaceExplorer(c, explorerRadius.current, mission.current.t, settings)} place={s =>
-      showAstro && mission.current.mode === "explore" && onPlanet(s, PLANETS[mission.current.planetIdx].id, explorerRadius, .85)} />
+      showAstro && mission.current.mode === "explore" && onPlanet(s, PLANETS[mission.current.planetIdx].id, explorerRadius, viewportSize.width < 640 ? .45 : .65)} />
     <ActivitySprite draw={c => drawRover(c, roverRadius.current, time.current)} place={s =>
-      settings.rovers && time.current % 18 < 16 && onPlanet(s, roverId(), roverRadius, .65)} />
+      settings.rovers && time.current % 18 < 16 && onPlanet(s, roverId(), roverRadius, viewportSize.width < 640 ? .4 : .55)} />
     <ActivitySprite draw={c => drawSolarActivity(c, 72, time.current)} place={s => {
       if (!settings.solar) return false;
       direction.copy(camera.position).normalize(); s.position.copy(direction).multiplyScalar(2.7);
       s.scale.setScalar(2.6 / 72 * 320); return true;
-    }} />
-    <ActivitySprite draw={c => drawStation(c, time.current, settings)} place={s => {
-      if (!settings.station) return false;
-      // Screen-right, outside the orbits, even when the camera is rotated.
-      const distance = camera.position.length();
-      const perspective = camera as THREE.PerspectiveCamera;
-      const halfWidth = distance * Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2)) * perspective.aspect;
-      s.position.set(halfWidth * .74, distance * .07, -distance).applyQuaternion(camera.quaternion).add(camera.position);
-      s.scale.setScalar(halfWidth * .42); return true;
     }} />
     <ActivitySprite draw={c => { c.scale(2, 2); drawMartianShip(c, time.current); }} place={s => {
       if (!settings.martian) return false;

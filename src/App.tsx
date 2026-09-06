@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import DraggableStation from "./components/DraggableStation";
 import SolarCanvas from "./components/SolarCanvas";
 import SolarScene3D from "./components/SolarScene3D";
 import ControlBar from "./components/ControlBar";
@@ -231,11 +232,13 @@ export default function App() {
             />
           )}
 
+          <DraggableStation settings={activities} />
+
           <MobileChips selectedId={selectedId} hoverId={hoverId} onSelect={inspect} />
           <PlanetRail selectedId={selectedId} hoverId={hoverId} onSelect={inspect} onHover={setHoverId} />
 
           {/* пульт управления */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
+          <div data-map-controls className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
             <ControlBar
               playing={playing}
               onTogglePlay={() => setPlaying((v) => !v)}
@@ -267,6 +270,8 @@ export default function App() {
             КЛИК ПО ОБЪЕКТУ — ИССЛЕДОВАНИЕ
             <br />
             КЛИК ПО ОРБИТЕ — ЗАКРЕПИТЬ ВЫДЕЛЕНИЕ
+            <br />
+            КОЛЕСО — МАСШТАБ · ПЕРЕТАСКИВАНИЕ — СДВИГ
             <br />
             SPACE — ПАУЗА · V — 2D/3D · B — ФОН · 1–8 — ПЛАНЕТЫ
           </div>
