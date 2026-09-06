@@ -85,6 +85,23 @@ assert.ok(geometry.orbitRadius3D(2.1)>geometry.orbitRadius3D(1.52));
 assert.ok(geometry.orbitRadius3D(3.3)<geometry.orbitRadius3D(5.2));
 console.log('PASS: circular orbital clearance, doubled 3D distances and asteroid belt placement');
 
+// Compact 2D paths must fit the available viewport without scaling any planet.
+for (const [width,height] of [[1615,697],[1010,434],[345,400]]) {
+  const compact=geometry.compactOrbits2D(width,height);
+  assert.equal(compact.sunRadius,74);
+  bodies.forEach((p,i)=>{
+    const radius=geometry.PLANET_RADIUS_2D(p.diameterKm);
+    assert.equal(compact.planetRadii[i],radius,'resizing only changes orbital paths');
+    const xExtent=radius*1.24*(p.ring?2.4:1),yExtent=radius*1.24*(p.ring?1.35:1);
+    for(let j=0;j<360;j++) {
+      const a=j*Math.PI/180;
+      assert.ok(Math.abs(Math.cos(a)*compact.radii[i])+xExtent<=width/2+1e-6,`${p.id} fits horizontally`);
+      assert.ok(Math.abs(Math.sin(a)*compact.radii[i])+yExtent<=height/2+1e-6,`${p.id} fits vertically`);
+    }
+  });
+}
+console.log('PASS: all 8 orbital paths fit at all angles while planet sizes remain unchanged');
+
 // Exercise the actual 2D state update at multiple frame rates.
 let source=fs.readFileSync('src/components/SolarCanvas.tsx','utf8');
 const start=source.indexOf('    const stepAstronaut =');
@@ -114,3 +131,37 @@ for(const fps of [30,60,120]) {
   assert.deepEqual([...modes].sort(),['landing','surface','takeoff','toPlanet']); assert.ok(takeoffs>=2);
   console.log(`PASS ${fps} FPS: vertical landing, planet tracking and repeated takeoff`);
 }
+
+// Exercise the actual pointer handlers, including a constellation crossing an orbit.
+const hit=load(path.resolve('src/lib/constellationGeometry.ts'));
+const shape={name:'TEST CONSTELLATION',pts:[[0,0],[1,0],[1,1],[0,1]],seg:[[0,1],[1,2],[2,3]]};
+const inst={c:0,x:300,y:220,s:200,rot:.45,glow:0};
+const pts=hit.constellationPoints(shape.pts,inst);
+const middle=[(pts[0][0]+pts[1][0])/2,(pts[0][1]+pts[1][1])/2];
+assert.ok(hit.hitsConstellation(...middle,shape,inst),'lines can be grabbed between stars');
+assert.ok(hit.hitsConstellation(300,220,shape,inst),'name can be grabbed');
+assert.ok(!hit.hitsConstellation(-500,-500,shape,inst));
+const captured=new Set(),interactions=[];
+const ctxDrag=vm.createContext({
+  hitsConstellation:hit.hitsConstellation,CONSTELLATIONS:[shape],cInsts:[inst],mouse:{x:0,y:0},hoverId:null,
+  cameraRef:{current:{panX:0,panY:0}},pick:()=>null,pickOrbit:()=> 'earth',
+  propsRef:{current:{showOrbits:true,onSelect:id=>interactions.push(['planet',id]),onOrbitSelect:id=>interactions.push(['orbit',id]),onHover(){}}},
+  canvas:{style:{},getBoundingClientRect:()=>({left:10,top:20}),setPointerCapture:id=>captured.add(id),hasPointerCapture:id=>captured.has(id),releasePointerCapture:id=>captured.delete(id)}
+});
+const handlers=source.slice(source.indexOf('    let dragIdx ='),source.indexOf('    const onWheel ='));
+vm.runInContext(ts.transpile(handlers)+'\nglobalThis.handlers={onDown,onMove,onLeave,onUp};',ctxDrag);
+const event=(x,y,id=7)=>({clientX:x+10,clientY:y+20,pointerId:id,isPrimary:true,button:0,preventDefault(){}});
+ctxDrag.handlers.onDown(event(...middle));assert.ok(captured.has(7));
+ctxDrag.handlers.onLeave();
+ctxDrag.handlers.onMove(event(middle[0]+120,middle[1]+50));
+assert.equal(inst.x,420);assert.equal(inst.y,270);
+assert.equal(ctxDrag.cameraRef.current.panX,0);assert.deepEqual(interactions,[],'constellation drag wins over orbit selection');
+ctxDrag.handlers.onMove(event(0,0,9));assert.equal(inst.x,420,'other pointers cannot hijack drag');
+ctxDrag.handlers.onUp(event(0,0,9));assert.ok(captured.has(7));
+ctxDrag.handlers.onUp(event(0,0));assert.equal(captured.size,0);
+ctxDrag.handlers.onDown(event(-400,-400));assert.deepEqual(interactions,[['orbit','earth']],'ordinary orbit clicks still work');
+ctxDrag.pickOrbit=()=>null;
+ctxDrag.handlers.onDown(event(-400,-400));ctxDrag.handlers.onMove(event(-310,-430));
+assert.equal(ctxDrag.cameraRef.current.panX,90);assert.equal(ctxDrag.cameraRef.current.panY,-30);
+ctxDrag.handlers.onUp(event(0,0));assert.equal(captured.size,0);
+console.log('PASS: star/line/name hit testing, pointer capture, orbit priority, cancellation and background panning');

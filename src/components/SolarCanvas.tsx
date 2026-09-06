@@ -1,4 +1,5 @@
-import { PLANET_RADIUS_2D, SUN_RADIUS_2D, spacedOrbits } from "../lib/orbitLayout";
+import { constellationPoints, hitsConstellation } from "../lib/constellationGeometry";
+import { PLANET_RADIUS_2D, SUN_RADIUS_2D, compactOrbits2D } from "../lib/orbitLayout";
 import { useEffect, useRef, useState } from "react";
 import { PLANETS, SUN, SPIN_DAYS, type BodyData } from "../data/planets";
 import { getTexture } from "../lib/textures";
@@ -355,17 +356,13 @@ interface Props {
 
 export default function SolarCanvas(props: Props) {
   const [zoom, setZoom] = useState(1);
-  const [overviewMode, setOverviewMode] = useState(false);
-  const fitScaleRef = useRef(1);
-  const cameraRef = useRef({ zoom: 1, panX: 0, panY: 0, overview: false });
+  const cameraRef = useRef({ zoom: 1, panX: 0, panY: 0 });
   const zoomBy = (factor: number) => {
-    const c = cameraRef.current;
-    c.zoom = clamp(c.zoom * (c.overview ? fitScaleRef.current : 1) * factor, .02, 6);
-    c.overview = false; setOverviewMode(false);
+    cameraRef.current.zoom = clamp(cameraRef.current.zoom * factor, .2, 6);
     setZoom(cameraRef.current.zoom);
   };
-  const overview = () => { cameraRef.current = { zoom: 1, panX: 0, panY: 0, overview: true }; setZoom(1); setOverviewMode(true); };
-  const fullSize = () => { cameraRef.current = { zoom: 1, panX: 0, panY: 0, overview: false }; setZoom(1); setOverviewMode(false); };
+  const overview = () => { cameraRef.current = { zoom: 1, panX: 0, panY: 0 }; setZoom(1); };
+  const fullSize = () => { cameraRef.current = { zoom: 1.5, panX: 0, panY: 0 }; setZoom(1.5); };
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simRef = useRef({ simDays: 0 });
@@ -1435,19 +1432,15 @@ export default function SolarCanvas(props: Props) {
     };
 
     const layout = () => {
-      const world = spacedOrbits();
-      const edge = PLANET_RADIUS_2D(PLANETS[7].diameterKm) * 1.3;
       const top = W < 640 ? 110 : 35, bottom = controlsReserve;
       const left = W >= 900 ? 235 : 25, right = 35;
-      const centerX = left + (W - left - right) / 2;
-      const centerY = top + Math.max(80, H - top - bottom) / 2;
-      const fit = Math.min(Math.max(80, W-left-right), Math.max(80,H-top-bottom)) / 2 / (world[7]+edge);
-      fitScaleRef.current = fit;
-      // Full-size planets on entry. Only the explicit overview fits the complete system.
-      const scale = cameraRef.current.zoom * (cameraRef.current.overview ? fit : 1);
-      cx = centerX + cameraRef.current.panX;
-      cy = centerY + cameraRef.current.panY;
-      return { sunR: SUN_RADIUS_2D * scale, radii: world.map(r=>r*scale), scale };
+      const availableW = Math.max(80, W - left - right);
+      const availableH = Math.max(80, H - top - bottom);
+      const compact = compactOrbits2D(availableW, availableH);
+      const scale = cameraRef.current.zoom;
+      cx = left + availableW / 2 + cameraRef.current.panX;
+      cy = top + availableH / 2 + cameraRef.current.panY;
+      return { sunR: SUN_RADIUS_2D * scale, radii: compact.radii.map(r => r * scale), scale };
     };
 
     const pick = (mx: number, my: number): string | null => {
@@ -1486,26 +1479,15 @@ export default function SolarCanvas(props: Props) {
 
     const hitConstellation = (mx: number, my: number): number => {
       for (let i = cInsts.length - 1; i >= 0; i--) {
-        const inst = cInsts[i];
-        const c = CONSTELLATIONS[inst.c];
-        const cr = Math.cos(inst.rot);
-        const sr = Math.sin(inst.rot);
-        for (const pt of c.pts) {
-          // те же преобразования, что и при отрисовке
-          const lx = (pt[0] - 0.5) * inst.s * 1.7;
-          const ly = (pt[1] - 0.5) * inst.s;
-          const wx = inst.x + lx * cr - ly * sr;
-          const wy = inst.y + lx * sr + ly * cr;
-          const dx = mx - wx;
-          const dy = my - wy;
-          if (dx * dx + dy * dy < 26 * 26) return i;
-        }
+        if (hitsConstellation(mx, my, CONSTELLATIONS[cInsts[i].c], cInsts[i])) return i;
       }
       return -1;
     };
 
+    let activePointerId: number | null = null;
     let panDrag: { id: number; x: number; y: number; px: number; py: number } | null = null;
     const onMove = (e: PointerEvent) => {
+      if (activePointerId !== null && activePointerId !== e.pointerId) return;
       const rect = canvas.getBoundingClientRect();
       mouse.x = e.clientX - rect.left;
       mouse.y = e.clientY - rect.top;
@@ -1521,14 +1503,17 @@ export default function SolarCanvas(props: Props) {
         inst.glow = 1;
         return;
       }
-      const id = pick(mouse.x, mouse.y) ?? pickOrbit(mouse.x, mouse.y);
+      const body = pick(mouse.x, mouse.y);
+      const ci = hitConstellation(mouse.x, mouse.y);
+      const id = body ?? (ci < 0 ? pickOrbit(mouse.x, mouse.y) : null);
       if (id !== hoverId) {
         hoverId = id;
         propsRef.current.onHover(id);
       }
-      canvas.style.cursor = id ? "pointer" : hitConstellation(mouse.x, mouse.y) >= 0 ? "grab" : "default";
+      canvas.style.cursor = body ? "pointer" : ci >= 0 ? "grab" : id ? "pointer" : "grab";
     };
     const onLeave = () => {
+      if (activePointerId !== null) return;
       mouse.x = -9999;
       mouse.y = -9999;
       dragIdx = -1;
@@ -1539,7 +1524,7 @@ export default function SolarCanvas(props: Props) {
       canvas.style.cursor = "default";
     };
     const onDown = (e: PointerEvent) => {
-      if (!e.isPrimary || e.button !== 0) return;
+      if (!e.isPrimary || e.button !== 0 || activePointerId !== null) return;
       onMove(e);
       const id = pick(mouse.x, mouse.y);
       if (id) {
@@ -1547,14 +1532,11 @@ export default function SolarCanvas(props: Props) {
         return;
       }
       if (mouse.x < -999) return;
-      // клик по орбите — зафиксировать/снять оранжевое выделение
-      const orb = pickOrbit(mouse.x, mouse.y);
-      if (orb) {
-        propsRef.current.onOrbitSelect(orb);
-        return;
-      }
       const ci = hitConstellation(mouse.x, mouse.y);
       if (ci >= 0) {
+        e.preventDefault();
+        activePointerId = e.pointerId;
+        canvas.setPointerCapture(e.pointerId);
         dragIdx = ci;
         const inst = cInsts[ci];
         dragOff.x = inst.x - mouse.x;
@@ -1562,29 +1544,30 @@ export default function SolarCanvas(props: Props) {
         inst.glow = 1;
         canvas.style.cursor = "grabbing";
       } else {
+        const orb = propsRef.current.showOrbits ? pickOrbit(mouse.x, mouse.y) : null;
+        if (orb) { propsRef.current.onOrbitSelect(orb); return; }
+        e.preventDefault(); activePointerId = e.pointerId;
         panDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, px: cameraRef.current.panX, py: cameraRef.current.panY };
         canvas.setPointerCapture(e.pointerId); canvas.style.cursor = 'grabbing';
       }
     };
-    const onUp = () => {
-      if (panDrag && canvas.hasPointerCapture(panDrag.id)) canvas.releasePointerCapture(panDrag.id);
-      panDrag = null; canvas.style.cursor = 'default';
-      if (dragIdx >= 0) {
-        dragIdx = -1;
-        canvas.style.cursor = hoverId ? "pointer" : "default";
-      }
+    const onUp = (e: PointerEvent) => {
+      if (activePointerId !== null && e.pointerId !== activePointerId) return;
+      const released = activePointerId;
+      activePointerId = null; panDrag = null; dragIdx = -1;
+      if (released !== null && canvas.hasPointerCapture(released)) canvas.releasePointerCapture(released);
+      canvas.style.cursor = 'grab';
     };
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = canvas.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top;
       layout();
-      const old = cameraRef.current.zoom * (cameraRef.current.overview ? fitScaleRef.current : 1);
-      const next = clamp(old * Math.exp(-e.deltaY * .0015), .02, 6), ratio = next / old;
+      const old = cameraRef.current.zoom;
+      const next = clamp(old * Math.exp(-e.deltaY * .0015), .2, 6), ratio = next / old;
       cameraRef.current.panX += (x - cx) * (1 - ratio);
       cameraRef.current.panY += (y - cy) * (1 - ratio);
-      cameraRef.current.zoom = next; cameraRef.current.overview = false;
-      setZoom(next); setOverviewMode(false);
+      cameraRef.current.zoom = next; setZoom(next);
     };
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('pointercancel', onUp);
@@ -1878,15 +1861,9 @@ export default function SolarCanvas(props: Props) {
         }
 
         const con = CONSTELLATIONS[inst.c];
-        const cosR = Math.cos(inst.rot);
-        const sinR = Math.sin(inst.rot);
         const breath = 0.5 + 0.5 * Math.sin(t * 0.35 + inst.ph);
 
-        const spts = con.pts.map((pt) => {
-          const dx = (pt[0] - 0.5) * inst.s * 1.7;
-          const dy = (pt[1] - 0.5) * inst.s;
-          return [inst.x + dx * cosR - dy * sinR, inst.y + dx * sinR + dy * cosR] as const;
-        });
+        const spts = constellationPoints(con.pts, inst);
 
         let near = ci === dragIdx;
         if (!near && mouse.x > -999) {
@@ -2580,9 +2557,9 @@ export default function SolarCanvas(props: Props) {
     <div ref={wrapRef} className="absolute inset-0">
       <div className="absolute right-3 top-12 z-20 flex items-center gap-1 rounded-lg border border-line bg-space-900/90 p-1 text-dim md:top-3" aria-label="Масштаб карты">
         <button type="button" aria-label="Уменьшить карту" title="Уменьшить" className="h-8 w-8 rounded hover:bg-white/10" onClick={()=>zoomBy(1/1.25)}>−</button>
-        <span className="w-12 text-center font-mono text-[10px]">{overviewMode ? "ОБЗОР" : `${Math.round(zoom*100)}%`}</span>
+        <span className="w-12 text-center font-mono text-[10px]">{Math.round(zoom*100)}%</span>
         <button type="button" aria-label="Увеличить карту" title="Увеличить" className="h-8 w-8 rounded hover:bg-white/10" onClick={()=>zoomBy(1.25)}>+</button>
-        <button type="button" title="Исходный крупный масштаб — 100%" className="h-8 rounded px-2 font-mono text-[10px] hover:bg-white/10" onClick={fullSize}>КРУПНО</button>
+        <button type="button" title="Приблизить карту до 150%" className="h-8 rounded px-2 font-mono text-[10px] hover:bg-white/10" onClick={fullSize}>КРУПНО</button>
         <button type="button" className="h-8 rounded px-2 font-mono text-[10px] hover:bg-white/10" onClick={overview}>ВСЯ СИСТЕМА</button>
       </div>
       <canvas ref={canvasRef} className="block touch-none" aria-label="Карта Солнечной системы" />
