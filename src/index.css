@@ -181,3 +181,18 @@ input[type="range"].speed-slider {
 .reveal.is-visible .bar-grow {
   animation: bar-grow 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* Keep the sky visible until the user approaches or operates the controls. */
+.map-control-panel {
+  transition: opacity 240ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .map-control-panel { opacity: .12; }
+  .map-control-panel:hover,
+  .map-control-panel:active,
+  .map-control-panel:has(:focus-visible) { opacity: 1; }
+}
+/* Touch devices have no hover; their controls remain fully visible. */
+@media (prefers-reduced-motion: reduce) {
+  .map-control-panel { transition: none; }
+}

@@ -56,7 +56,7 @@ export default function ControlBar({
   const pos = Math.round((Math.log(Math.max(1, speed)) / LOG365) * 1000);
 
   return (
-    <div className="pointer-events-auto flex max-w-[94vw] flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-lg border border-line bg-space-900/85 px-3.5 py-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-md">
+    <div aria-label="Панель управления" className="map-control-panel pointer-events-auto flex max-w-[94vw] flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-lg border border-line bg-space-900/85 px-3.5 py-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-md">
       {/* play / pause + reset */}
       <div className="flex items-center gap-2">
         <button

@@ -355,12 +355,17 @@ interface Props {
 
 export default function SolarCanvas(props: Props) {
   const [zoom, setZoom] = useState(1);
-  const cameraRef = useRef({ zoom: 1, panX: 0, panY: 0 });
+  const [overviewMode, setOverviewMode] = useState(false);
+  const fitScaleRef = useRef(1);
+  const cameraRef = useRef({ zoom: 1, panX: 0, panY: 0, overview: false });
   const zoomBy = (factor: number) => {
-    cameraRef.current.zoom = clamp(cameraRef.current.zoom * factor, .65, 6);
+    const c = cameraRef.current;
+    c.zoom = clamp(c.zoom * (c.overview ? fitScaleRef.current : 1) * factor, .02, 6);
+    c.overview = false; setOverviewMode(false);
     setZoom(cameraRef.current.zoom);
   };
-  const overview = () => { cameraRef.current = { zoom: 1, panX: 0, panY: 0 }; setZoom(1); };
+  const overview = () => { cameraRef.current = { zoom: 1, panX: 0, panY: 0, overview: true }; setZoom(1); setOverviewMode(true); };
+  const fullSize = () => { cameraRef.current = { zoom: 1, panX: 0, panY: 0, overview: false }; setZoom(1); setOverviewMode(false); };
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simRef = useRef({ simDays: 0 });
@@ -1430,18 +1435,19 @@ export default function SolarCanvas(props: Props) {
     };
 
     const layout = () => {
-      const aspect = W >= 900 ? .62 : 1;
-      const world = spacedOrbits(aspect);
+      const world = spacedOrbits();
       const edge = PLANET_RADIUS_2D(PLANETS[7].diameterKm) * 1.3;
       const top = W < 640 ? 110 : 35, bottom = controlsReserve;
       const left = W >= 900 ? 235 : 25, right = 35;
       const centerX = left + (W - left - right) / 2;
       const centerY = top + Math.max(80, H - top - bottom) / 2;
-      const fit = Math.min(Math.max(80, W-left-right)/2/(world[7]+edge), Math.max(80,H-top-bottom)/2/(world[7]*aspect+edge));
-      const scale = fit * cameraRef.current.zoom;
+      const fit = Math.min(Math.max(80, W-left-right), Math.max(80,H-top-bottom)) / 2 / (world[7]+edge);
+      fitScaleRef.current = fit;
+      // Full-size planets on entry. Only the explicit overview fits the complete system.
+      const scale = cameraRef.current.zoom * (cameraRef.current.overview ? fit : 1);
       cx = centerX + cameraRef.current.panX;
       cy = centerY + cameraRef.current.panY;
-      return { sunR: SUN_RADIUS_2D * scale, radii: world.map(r=>r*scale), scale, aspect };
+      return { sunR: SUN_RADIUS_2D * scale, radii: world.map(r=>r*scale), scale };
     };
 
     const pick = (mx: number, my: number): string | null => {
@@ -1456,8 +1462,8 @@ export default function SolarCanvas(props: Props) {
 
     /** попадание по кольцу орбиты */
     const pickOrbit = (mx: number, my: number): string | null => {
-      const { radii, aspect } = layout();
-      const dist = Math.hypot(mx - cx, (my - cy) / aspect);
+      const { radii } = layout();
+      const dist = Math.hypot(mx - cx, my - cy);
       for (let i = 0; i < PLANETS.length; i++) {
         if (Math.abs(dist - radii[i]) < 9) return PLANETS[i].id;
       }
@@ -1573,11 +1579,12 @@ export default function SolarCanvas(props: Props) {
       e.preventDefault();
       const rect = canvas.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top;
       layout();
-      const old = cameraRef.current.zoom;
-      const next = clamp(old * Math.exp(-e.deltaY * .0015), .65, 6), ratio = next / old;
+      const old = cameraRef.current.zoom * (cameraRef.current.overview ? fitScaleRef.current : 1);
+      const next = clamp(old * Math.exp(-e.deltaY * .0015), .02, 6), ratio = next / old;
       cameraRef.current.panX += (x - cx) * (1 - ratio);
       cameraRef.current.panY += (y - cy) * (1 - ratio);
-      cameraRef.current.zoom = next; setZoom(next);
+      cameraRef.current.zoom = next; cameraRef.current.overview = false;
+      setZoom(next); setOverviewMode(false);
     };
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('pointercancel', onUp);
@@ -1615,7 +1622,7 @@ export default function SolarCanvas(props: Props) {
       const t = now / 1000;
       worldT += dt;
 
-      const { sunR, radii, scale, aspect } = layout();
+      const { sunR, radii, scale } = layout();
       const m = Math.min(W, H);
       const lastOrbit = radii[radii.length - 1];
 
@@ -2070,7 +2077,7 @@ export default function SolarCanvas(props: Props) {
         const rr2 = radii[3] + (radii[4] - radii[3]) * rk.rf;
         ctx.globalAlpha = rk.alpha;
         ctx.fillStyle = rk.warm ? "#9b8570" : "#7e8698";
-        ctx.fillRect(cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2 * aspect, rk.size, rk.size);
+        ctx.fillRect(cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2, rk.size, rk.size);
       }
       ctx.globalAlpha = 1;
 
@@ -2081,7 +2088,7 @@ export default function SolarCanvas(props: Props) {
         const isSel = p.selectedId === d.id;
         const isHov = effHov === d.id;
         ctx.beginPath();
-        ctx.ellipse(cx, cy, r, r * aspect, 0, 0, TAU);
+        ctx.arc(cx, cy, r, 0, TAU);
         if (isSel) {
           // закреплённое выделение: мягкое свечение + янтарная линия
           ctx.strokeStyle = "rgba(255,181,71,0.14)";
@@ -2107,7 +2114,7 @@ export default function SolarCanvas(props: Props) {
         const r = radii[i];
         const ang = d.angle0 + TAU * (simDays / d.periodDays);
         const x = cx + Math.cos(ang) * r;
-        const y = cy + Math.sin(ang) * r * aspect;
+        const y = cy + Math.sin(ang) * r;
         // плавное увеличение при наведении
         const hsTarget = effHov === d.id ? 1.24 : 1;
         const hsPrev = hoverScales.get(d.id) ?? 1;
@@ -2120,7 +2127,7 @@ export default function SolarCanvas(props: Props) {
         for (let sIdx = 1; sIdx <= 8; sIdx++) {
           const a1 = ang - sIdx * 0.016;
           ctx.beginPath();
-          ctx.ellipse(cx, cy, r, r * aspect, 0, a1 - 0.017, a1);
+          ctx.arc(cx, cy, r, a1 - 0.017, a1);
           ctx.strokeStyle = d.color;
           ctx.globalAlpha = 0.13 * (1 - sIdx / 9);
           ctx.lineWidth = Math.max(0.5, pr * 0.85 * (1 - sIdx / 9));
@@ -2573,9 +2580,9 @@ export default function SolarCanvas(props: Props) {
     <div ref={wrapRef} className="absolute inset-0">
       <div className="absolute right-3 top-12 z-20 flex items-center gap-1 rounded-lg border border-line bg-space-900/90 p-1 text-dim md:top-3" aria-label="Масштаб карты">
         <button type="button" aria-label="Уменьшить карту" title="Уменьшить" className="h-8 w-8 rounded hover:bg-white/10" onClick={()=>zoomBy(1/1.25)}>−</button>
-        <span className="w-12 text-center font-mono text-[10px]">{Math.round(zoom*100)}%</span>
+        <span className="w-12 text-center font-mono text-[10px]">{overviewMode ? "ОБЗОР" : `${Math.round(zoom*100)}%`}</span>
         <button type="button" aria-label="Увеличить карту" title="Увеличить" className="h-8 w-8 rounded hover:bg-white/10" onClick={()=>zoomBy(1.25)}>+</button>
-        <button type="button" title="Рассмотреть планеты и работу астронавта" className="h-8 rounded px-2 font-mono text-[10px] hover:bg-white/10" onClick={()=>{ cameraRef.current.zoom = 3; setZoom(3); }}>КРУПНО</button>
+        <button type="button" title="Исходный крупный масштаб — 100%" className="h-8 rounded px-2 font-mono text-[10px] hover:bg-white/10" onClick={fullSize}>КРУПНО</button>
         <button type="button" className="h-8 rounded px-2 font-mono text-[10px] hover:bg-white/10" onClick={overview}>ВСЯ СИСТЕМА</button>
       </div>
       <canvas ref={canvasRef} className="block touch-none" aria-label="Карта Солнечной системы" />

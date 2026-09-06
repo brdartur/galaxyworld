@@ -64,12 +64,12 @@ console.log('PASS: mission phases, drawing coordinates over 180 seconds, rover t
 // Adjacent orbital lanes must retain body/ring clearance even at conjunction.
 const geometry=load(path.resolve('src/lib/orbitLayout.ts'));
 const bodies=load(path.resolve('src/data/planets.ts')).PLANETS;
-for(const aspect of [1,.62]) {
-  const radii=geometry.spacedOrbits(aspect);
+{
+  const radii=geometry.spacedOrbits();
   let previous=0, previousExtent=geometry.SUN_RADIUS_2D;
   bodies.forEach((p,i)=>{
     const extent=geometry.PLANET_RADIUS_2D(p.diameterKm)*1.24*(p.ring?2.6:1);
-    assert.ok((radii[i]-previous)*aspect >= previousExtent+extent+23.999);
+    assert.ok(radii[i]-previous >= previousExtent+extent+23.999);
     previous=radii[i];previousExtent=extent;
   });
 }
@@ -83,7 +83,7 @@ bodies.forEach(p=>{
 });
 assert.ok(geometry.orbitRadius3D(2.1)>geometry.orbitRadius3D(1.52));
 assert.ok(geometry.orbitRadius3D(3.3)<geometry.orbitRadius3D(5.2));
-console.log('PASS: orbital clearance in both projections, doubled 3D distances and asteroid belt placement');
+console.log('PASS: circular orbital clearance, doubled 3D distances and asteroid belt placement');
 
 // Exercise the actual 2D state update at multiple frame rates.
 let source=fs.readFileSync('src/components/SolarCanvas.tsx','utf8');

@@ -3,11 +3,11 @@ import { PLANETS } from "../data/planets";
 export const PLANET_RADIUS_2D = (km: number) => Math.min(11, Math.max(3.4, 3.1 + 6.4 * Math.sqrt(km / 142984))) * 6;
 export const SUN_RADIUS_2D = 74;
 /** Maintain clearance even when neighbours align and Saturn's rings face the gap. */
-export function spacedOrbits(aspect = 1) {
+export function spacedOrbits() {
   let previousOrbit = 0, previousExtent = SUN_RADIUS_2D;
   return PLANETS.map(p => {
     const extent = PLANET_RADIUS_2D(p.diameterKm) * 1.24 * (p.ring ? 2.6 : 1);
-    const orbit = previousOrbit + (previousExtent + extent + 24) / aspect;
+    const orbit = previousOrbit + previousExtent + extent + 24;
     previousOrbit = orbit; previousExtent = extent;
     return orbit;
   });
