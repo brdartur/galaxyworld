@@ -1,5 +1,5 @@
 import { constellationPoints, hitsConstellation } from "../lib/constellationGeometry";
-import { PLANET_RADIUS_2D, SUN_RADIUS_2D, compactOrbits2D } from "../lib/orbitLayout";
+import { PLANET_RADIUS_2D, SUN_RADIUS_2D, ORBIT_STRETCH_X_2D, compactOrbits2D, isNearOrbit2D } from "../lib/orbitLayout";
 import { useEffect, useRef, useState } from "react";
 import { PLANETS, SUN, SPIN_DAYS, type BodyData } from "../data/planets";
 import { getTexture } from "../lib/textures";
@@ -1456,9 +1456,8 @@ export default function SolarCanvas(props: Props) {
     /** попадание по кольцу орбиты */
     const pickOrbit = (mx: number, my: number): string | null => {
       const { radii } = layout();
-      const dist = Math.hypot(mx - cx, my - cy);
       for (let i = 0; i < PLANETS.length; i++) {
-        if (Math.abs(dist - radii[i]) < 9) return PLANETS[i].id;
+        if (isNearOrbit2D(mx - cx, my - cy, radii[i])) return PLANETS[i].id;
       }
       return null;
     };
@@ -2054,7 +2053,7 @@ export default function SolarCanvas(props: Props) {
         const rr2 = radii[3] + (radii[4] - radii[3]) * rk.rf;
         ctx.globalAlpha = rk.alpha;
         ctx.fillStyle = rk.warm ? "#9b8570" : "#7e8698";
-        ctx.fillRect(cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2, rk.size, rk.size);
+        ctx.fillRect(cx + Math.cos(a) * rr2 * ORBIT_STRETCH_X_2D, cy + Math.sin(a) * rr2, rk.size, rk.size);
       }
       ctx.globalAlpha = 1;
 
@@ -2065,7 +2064,7 @@ export default function SolarCanvas(props: Props) {
         const isSel = p.selectedId === d.id;
         const isHov = effHov === d.id;
         ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, TAU);
+        ctx.ellipse(cx, cy, r * ORBIT_STRETCH_X_2D, r, 0, 0, TAU);
         if (isSel) {
           // закреплённое выделение: мягкое свечение + янтарная линия
           ctx.strokeStyle = "rgba(255,181,71,0.14)";
@@ -2090,7 +2089,7 @@ export default function SolarCanvas(props: Props) {
         const d = PLANETS[i];
         const r = radii[i];
         const ang = d.angle0 + TAU * (simDays / d.periodDays);
-        const x = cx + Math.cos(ang) * r;
+        const x = cx + Math.cos(ang) * r * ORBIT_STRETCH_X_2D;
         const y = cy + Math.sin(ang) * r;
         // плавное увеличение при наведении
         const hsTarget = effHov === d.id ? 1.24 : 1;
@@ -2104,7 +2103,7 @@ export default function SolarCanvas(props: Props) {
         for (let sIdx = 1; sIdx <= 8; sIdx++) {
           const a1 = ang - sIdx * 0.016;
           ctx.beginPath();
-          ctx.arc(cx, cy, r, a1 - 0.017, a1);
+          ctx.ellipse(cx, cy, r * ORBIT_STRETCH_X_2D, r, 0, a1 - 0.017, a1);
           ctx.strokeStyle = d.color;
           ctx.globalAlpha = 0.13 * (1 - sIdx / 9);
           ctx.lineWidth = Math.max(0.5, pr * 0.85 * (1 - sIdx / 9));

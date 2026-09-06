@@ -88,19 +88,26 @@ console.log('PASS: circular orbital clearance, doubled 3D distances and asteroid
 // Compact 2D paths must fit the available viewport without scaling any planet.
 for (const [width,height] of [[1615,697],[1010,434],[345,400]]) {
   const compact=geometry.compactOrbits2D(width,height);
-  assert.equal(compact.sunRadius,74);
+  assert.equal(compact.sunRadius,74 * .75);
+  assert.ok(geometry.ORBIT_STRETCH_X_2D > 1, 'ellipses extend horizontally');
   bodies.forEach((p,i)=>{
     const radius=geometry.PLANET_RADIUS_2D(p.diameterKm);
     assert.equal(compact.planetRadii[i],radius,'resizing only changes orbital paths');
     const xExtent=radius*1.24*(p.ring?2.4:1),yExtent=radius*1.24*(p.ring?1.35:1);
     for(let j=0;j<360;j++) {
       const a=j*Math.PI/180;
-      assert.ok(Math.abs(Math.cos(a)*compact.radii[i])+xExtent<=width/2+1e-6,`${p.id} fits horizontally`);
+      const x=Math.cos(a)*compact.radii[i]*geometry.ORBIT_STRETCH_X_2D;
+      const y=Math.sin(a)*compact.radii[i];
+      assert.ok(Math.abs(x)+xExtent<=width/2+1e-6,`${p.id} fits horizontally`);
       assert.ok(Math.abs(Math.sin(a)*compact.radii[i])+yExtent<=height/2+1e-6,`${p.id} fits vertically`);
+      assert.ok(geometry.isNearOrbit2D(x,y,compact.radii[i]),`${p.id} can be selected anywhere on its ellipse`);
     }
   });
 }
 console.log('PASS: all 8 orbital paths fit at all angles while planet sizes remain unchanged');
+assert.ok(!geometry.isNearOrbit2D(100,0,100),'old circle edge does not select the horizontal ellipse');
+assert.ok(geometry.isNearOrbit2D(165,0,100),'orbit hit tolerance is measured in screen pixels');
+assert.ok(!geometry.isNearOrbit2D(175,0,100),'points outside the hit tolerance are rejected');
 
 // Exercise the actual 2D state update at multiple frame rates.
 let source=fs.readFileSync('src/components/SolarCanvas.tsx','utf8');

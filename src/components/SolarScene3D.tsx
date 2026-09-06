@@ -1,4 +1,4 @@
-import { orbitRadius3D } from "../lib/orbitLayout";
+import { orbitRadius3D, SUN_RADIUS_3D } from "../lib/orbitLayout";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame } from "@react-three/fiber";
@@ -150,7 +150,7 @@ function bandTexture(): THREE.CanvasTexture {
 /* ---------- масштаб ---------- */
 export const orbitR3 = orbitRadius3D;
 const planetR3 = (km: number) => (0.24 + Math.sqrt(km / 142984) * 1.5) * 2 * .75;
-const SUN_R = 2.6;
+const SUN_R = SUN_RADIUS_3D;
 
 function OrbitRing({ r, tone }: { r: number; tone: "sel" | "hov" | "plain" }) {
   const pts = useMemo(() => {

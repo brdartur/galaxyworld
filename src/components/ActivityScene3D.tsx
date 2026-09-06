@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { PLANETS } from "../data/planets";
+import { SUN_RADIUS_3D } from "../lib/orbitLayout";
 import { ROVER_PLANETS, type ActivitySettings } from "../lib/activitySettings";
 import { drawMartianShip, drawRover, drawSolarActivity, drawSurfaceExplorer } from "../lib/activityDrawing";
 
@@ -78,8 +79,8 @@ export default function ActivityScene3D({ settings, showAstro, mission, planets,
       settings.rovers && time.current % 18 < 16 && onPlanet(s, roverId(), roverRadius, viewportSize.width < 640 ? .4 : .55)} />
     <ActivitySprite draw={c => drawSolarActivity(c, 72, time.current)} place={s => {
       if (!settings.solar) return false;
-      direction.copy(camera.position).normalize(); s.position.copy(direction).multiplyScalar(2.7);
-      s.scale.setScalar(2.6 / 72 * 320); return true;
+      direction.copy(camera.position).normalize(); s.position.copy(direction).multiplyScalar(SUN_RADIUS_3D + .1);
+      s.scale.setScalar(SUN_RADIUS_3D / 72 * 320); return true;
     }} />
     <ActivitySprite draw={c => { c.scale(2, 2); drawMartianShip(c, time.current); }} place={s => {
       if (!settings.martian) return false;
