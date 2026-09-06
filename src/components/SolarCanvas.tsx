@@ -1,10 +1,12 @@
-import { constellationPoints, hitsConstellation } from "../lib/constellationGeometry";
+import { constellationPoints, hitsConstellation, keepConstellationOutside } from "../lib/constellationGeometry";
 import { PLANET_RADIUS_2D, SUN_RADIUS_2D, ORBIT_STRETCH_X_2D, compactOrbits2D, isNearOrbit2D } from "../lib/orbitLayout";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { PLANETS, SUN, SPIN_DAYS, type BodyData } from "../data/planets";
 import { getTexture } from "../lib/textures";
 
-import { SURFACE_DURATION, ROVER_PLANETS, smooth, type ActivitySettings } from "../lib/activitySettings";
+import { solarPlasma } from '../lib/solarAppearance';
+import type { ScreenAnchor } from '../lib/radioSignal';
+import { SURFACE_ACTOR_SCALE, SURFACE_DURATION, ROVER_PLANETS, smooth, type ActivitySettings } from "../lib/activitySettings";
 import { drawSurfaceExplorer, drawRover, drawLander, drawSolarActivity, drawMartianShip } from "../lib/activityDrawing";
 
 const TAU = Math.PI * 2;
@@ -334,6 +336,7 @@ function buildFrame(body: BodyData, k: number): HTMLCanvasElement {
 }
 
 interface Props {
+  earthAnchor: MutableRefObject<ScreenAnchor | null>;
   activities: ActivitySettings;
   playing: boolean;
   speed: number;
@@ -666,7 +669,7 @@ export default function SolarCanvas(props: Props) {
     };
 
     /* ================= астронавт: выбор цели, полёт, посадка, бурение ================= */
-    const activityScale = () => clamp(Math.min(W, H) / 900, .45, 1);
+    const activityScale = () => clamp(Math.min(W, H) / 900, .45, 1) * SURFACE_ACTOR_SCALE;
     const stepAstronaut = (d: number) => {
       const a = astronaut;
 
@@ -1473,6 +1476,11 @@ export default function SolarCanvas(props: Props) {
     };
 
     /* ---- захват созвездий курсором ---- */
+    const keepSkyOutside = (inst: CInst) => {
+      const { radii } = layout(), outer = radii[radii.length - 1];
+      keepConstellationOutside(CONSTELLATIONS[inst.c], inst,
+        { x: cx, y: cy, rx: outer * ORBIT_STRETCH_X_2D + 30, ry: outer + 30 }, W, H);
+    };
     let dragIdx = -1;
     const dragOff = { x: 0, y: 0 };
 
@@ -1499,6 +1507,7 @@ export default function SolarCanvas(props: Props) {
         const inst = cInsts[dragIdx];
         inst.x = mouse.x + dragOff.x;
         inst.y = mouse.y + dragOff.y;
+        keepSkyOutside(inst);
         inst.glow = 1;
         return;
       }
@@ -1859,6 +1868,7 @@ export default function SolarCanvas(props: Props) {
           if (inst.y > H + pad) inst.y = -pad;
         }
 
+        keepSkyOutside(inst);
         const con = CONSTELLATIONS[inst.c];
         const breath = 0.5 + 0.5 * Math.sin(t * 0.35 + inst.ph);
 
@@ -2117,7 +2127,10 @@ export default function SolarCanvas(props: Props) {
         }
 
         // запоминаем позиции Земли и Марса для постоянного НЛО
-        if (d.id === "earth") earthPos = { x, y, r: pr };
+        if (d.id === "earth") {
+          earthPos = { x, y, r: pr };
+          propsRef.current.earthAnchor.current = x + pr >= 0 && x - pr <= W && y + pr >= 0 && y - pr <= H ? { x, y, radius: pr } : null;
+        }
         if (d.id === "mars") marsPos = { x, y, r: pr };
 
         // цветовое свечение-подложка (планеты ярче и заметнее)
@@ -2206,13 +2219,13 @@ export default function SolarCanvas(props: Props) {
       }
 
       /* ---- Солнце: статичное, постоянный диаметр ---- */
-      // белая корона в три слоя — как на настоящих снимках
+      // Корона в той же оранжевой палитре, что и протуберанцы
       const glowR = sunR * 3.4;
       const gg = ctx.createRadialGradient(cx, cy, sunR * 0.5, cx, cy, glowR);
-      gg.addColorStop(0, "rgba(255,246,228,0.42)");
-      gg.addColorStop(0.3, "rgba(255,222,168,0.18)");
-      gg.addColorStop(0.62, "rgba(255,190,120,0.06)");
-      gg.addColorStop(1, "rgba(255,180,110,0)");
+      gg.addColorStop(0, solarPlasma(.30));
+      gg.addColorStop(0.3, solarPlasma(.14));
+      gg.addColorStop(0.62, solarPlasma(.05));
+      gg.addColorStop(1, solarPlasma(0));
       ctx.fillStyle = gg;
       ctx.beginPath();
       ctx.arc(cx, cy, glowR, 0, TAU);
@@ -2237,8 +2250,8 @@ export default function SolarCanvas(props: Props) {
       ctx.arc(cx, cy, sRad + 0.6, 0, TAU);
       ctx.stroke();
       const coreG = ctx.createRadialGradient(cx, cy, 0, cx, cy, sRad * 0.55);
-      coreG.addColorStop(0, "rgba(255,255,240,0.3)");
-      coreG.addColorStop(1, "rgba(255,255,240,0)");
+      coreG.addColorStop(0, solarPlasma(.12));
+      coreG.addColorStop(1, solarPlasma(0));
       ctx.fillStyle = coreG;
       ctx.beginPath();
       ctx.arc(cx, cy, sRad * 0.55, 0, TAU);
@@ -2540,6 +2553,7 @@ export default function SolarCanvas(props: Props) {
     raf = requestAnimationFrame(frame);
 
     return () => {
+      propsRef.current.earthAnchor.current = null;
       cancelAnimationFrame(raf);
       ro.disconnect();
       canvas.removeEventListener('wheel', onWheel);

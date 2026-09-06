@@ -3,6 +3,8 @@
    + domain warping для живых завихрений облаков. Бесшовность по долготе —
    через цилиндрические координаты. Никаких сетевых ресурсов. */
 
+import { SOLAR_PLASMA_RGB } from './solarAppearance';
+
 export interface TexData {
   w: number;
   h: number;
@@ -158,14 +160,14 @@ function sunGen(w: number, h: number): TexData {
     const cell = Math.abs(nCell(wx2, wy2, wz)); // ridged -> сетка ярких ячеек
     const m = 0.9 + (gran - 0.5) * 0.18 + cell * 0.06;
     // Мелкая грануляция яркой фотосферы, без крупных тёмных «кратеров».
-    let r = 255 * m;
-    let g = 221 * m;
-    let b = 137 * m * m;
+    let r = SOLAR_PLASMA_RGB[0] * m;
+    let g = SOLAR_PLASMA_RGB[1] * m;
+    let b = SOLAR_PLASMA_RGB[2] * m * m;
     // горячие факелы
     const hot = smoothstep(0.62, 0.85, gran + cell * 0.3);
     r += hot * 6;
-    g += hot * 22;
-    b += hot * 26;
+    g += hot * 12;
+    b += hot * 8;
     // солнечные пятна: тёмное ядро + полутень
     for (const s of spots) {
       let du = u - s.u;

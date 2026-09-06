@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import RadioLink from './components/RadioLink';
+import type { ScreenAnchor } from './lib/radioSignal';
 import DraggableStation from "./components/DraggableStation";
 import SolarCanvas from "./components/SolarCanvas";
 import SolarScene3D from "./components/SolarScene3D";
@@ -52,6 +54,8 @@ export default function App() {
   });
   const bgLabel = BG_THEMES.find((t) => t.id === bgTheme)?.label ?? "ГЛУБОКИЙ КОСМОС";
   const [isFs, setIsFs] = useState(false);
+  const earthAnchor = useRef<ScreenAnchor | null>(null);
+  const stationAnchor = useRef<ScreenAnchor | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -190,6 +194,7 @@ export default function App() {
         <div ref={mapRef} className="relative min-h-0 flex-1 overflow-hidden">
           {view3d ? (
             <SolarScene3D
+              earthAnchor={earthAnchor}
               playing={playing}
               speed={speed}
               showOrbits={showOrbits}
@@ -211,6 +216,7 @@ export default function App() {
             />
           ) : (
             <SolarCanvas
+              earthAnchor={earthAnchor}
               playing={playing}
               speed={speed}
               showOrbits={showOrbits}
@@ -232,7 +238,8 @@ export default function App() {
             />
           )}
 
-          <DraggableStation settings={activities} />
+          <RadioLink enabled={activities.radio && activities.station} station={stationAnchor} earth={earthAnchor} />
+          <DraggableStation settings={activities} antenna={stationAnchor} />
 
           <MobileChips selectedId={selectedId} hoverId={hoverId} onSelect={inspect} />
           <PlanetRail selectedId={selectedId} hoverId={hoverId} onSelect={inspect} onHover={setHoverId} />

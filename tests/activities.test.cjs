@@ -150,7 +150,7 @@ assert.ok(hit.hitsConstellation(300,220,shape,inst),'name can be grabbed');
 assert.ok(!hit.hitsConstellation(-500,-500,shape,inst));
 const captured=new Set(),interactions=[];
 const ctxDrag=vm.createContext({
-  hitsConstellation:hit.hitsConstellation,CONSTELLATIONS:[shape],cInsts:[inst],mouse:{x:0,y:0},hoverId:null,
+  keepSkyOutside(){}, hitsConstellation:hit.hitsConstellation,CONSTELLATIONS:[shape],cInsts:[inst],mouse:{x:0,y:0},hoverId:null,
   cameraRef:{current:{panX:0,panY:0}},pick:()=>null,pickOrbit:()=> 'earth',
   propsRef:{current:{showOrbits:true,onSelect:id=>interactions.push(['planet',id]),onOrbitSelect:id=>interactions.push(['orbit',id]),onHover(){}}},
   canvas:{style:{},getBoundingClientRect:()=>({left:10,top:20}),setPointerCapture:id=>captured.add(id),hasPointerCapture:id=>captured.has(id),releasePointerCapture:id=>captured.delete(id)}
@@ -172,3 +172,39 @@ ctxDrag.handlers.onDown(event(-400,-400));ctxDrag.handlers.onMove(event(-310,-43
 assert.equal(ctxDrag.cameraRef.current.panX,90);assert.equal(ctxDrag.cameraRef.current.panY,-30);
 ctxDrag.handlers.onUp(event(0,0));assert.equal(captured.size,0);
 console.log('PASS: star/line/name hit testing, pointer capture, orbit priority, cancellation and background panning');
+
+// A whole constellation must remain outside after dragging, resizing and camera motion.
+for(const [width,height,rx,ry] of [[1280,720,420,220],[1885,936,620,330],[390,720,150,100]]) {
+  for(const rot of [-.6,0,.6]) {
+    const sky={x:width/2,y:height/2,s:100,rot};
+    for(const pan of [0,80,-50]) {
+      const exclusion={x:width/2+pan,y:height/2,rx,ry};
+      hit.keepConstellationOutside(shape,sky,exclusion,width,height);
+      const pts=hit.constellationPoints(shape.pts,sky);
+      const outside=(x,y)=>((x-exclusion.x)/rx)**2+((y-exclusion.y)/ry)**2>=1-1e-8;
+      for(const [a,b] of shape.seg)for(let j=0;j<=100;j++) {
+        const f=j/100;
+        assert.ok(outside(pts[a][0]*(1-f)+pts[b][0]*f,pts[a][1]*(1-f)+pts[b][1]*f),'entire connecting line stays outside');
+      }
+      const x=pts.reduce((s,p)=>s+p[0],0)/pts.length,y=pts.reduce((s,p)=>s+p[1],0)/pts.length;
+      for(const dx of [-shape.name.length*3.7-6,0,shape.name.length*3.7+6])for(const dy of [-12,0,12])assert.ok(outside(x+dx,y+dy),'name remains outside');
+    }
+  }
+}
+const screen=load(path.resolve('src/lib/screenGeometry.ts'));
+const diamond=[[0,-100],[100,0],[0,100],[-100,0]];
+assert.ok(screen.boxIntersectsPolygon({left:-150,right:150,top:-5,bottom:5},diamond),'crossing lines cannot pass through 3D orbital disk');
+assert.ok(!screen.boxIntersectsPolygon({left:70,right:90,top:70,bottom:90},diamond),'sky remains visible in free corners outside the projected orbit');
+const radio=load(path.resolve('src/lib/radioSignal.ts'));
+const station={x:20,y:30,radius:0},earth={x:400,y:200,radius:26};
+for(const offset of [0,120,-70]) {
+  const start={...station,x:station.x+offset},end={...earth,y:earth.y+offset};
+  const beam=radio.radioPath(start,end);
+  assert.equal(beam.x,start.x);assert.equal(beam.y,start.y);
+  assert.ok(Math.abs(Math.hypot(beam.endX-end.x,beam.endY-end.y)-end.radius)<1e-8,'beam terminates at the moving Earth surface');
+  for(let t=0;t<20;t+=.1){radio.drawRadioSignal(ctx,start,end,t);assert.equal(stack,0);calls.length=0;}
+}
+assert.equal(radio.radioPath(null,earth),null);
+assert.equal(radio.radioPath(station,null),null);
+assert.equal(radio.radioPath(station,{...station,radius:20}),null);
+console.log('PASS: constellation exclusion, projected 3D sky and moving station-to-Earth radio signal');

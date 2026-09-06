@@ -4,6 +4,7 @@ export const ACTIVITY_LABELS = {
   rovers: "ЛУНОХОДЫ",
   solar: "АКТИВНОСТЬ СОЛНЦА",
   station: "СТАНЦИЯ",
+  radio: "РАДИОСИГНАЛ",
   stationCrew: "ЭКИПАЖ СТАНЦИИ",
   stationRepair: "РЕМОНТ СТАНЦИИ",
   spacewalk: "ВЫХОД В КОСМОС",
@@ -15,8 +16,9 @@ export type ActivityKey = keyof typeof ACTIVITY_LABELS;
 export type ActivitySettings = Record<ActivityKey, boolean>;
 export const DEFAULT_ACTIVITIES: ActivitySettings = {
   drilling: true, research: true, rovers: true, solar: true,
-  station: true, stationCrew: true, stationRepair: true, spacewalk: true, martian: true, disks: true,
+  radio: true, station: true, stationCrew: true, stationRepair: true, spacewalk: true, martian: true, disks: true,
 };
+export const SURFACE_ACTOR_SCALE = .7;
 export const SURFACE_DURATION = 40;
 export const ROVER_PLANETS = ["jupiter", "saturn", "uranus", "neptune"];
 export const smooth = (t: number) => {

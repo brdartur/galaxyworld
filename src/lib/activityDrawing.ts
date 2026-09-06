@@ -1,3 +1,4 @@
+import { solarPlasma } from './solarAppearance';
 import { smooth, surfaceMission, type ActivitySettings } from "./activitySettings";
 
 const TAU = Math.PI * 2;
@@ -283,7 +284,7 @@ export function drawSolarActivity(c: Ctx, radius: number, t: number) {
     for(let j=0;j<18;j++){
       const spread=j/17,h=radius*(.1+env*.23)*(1-spread*.3),w=radius*(.07+spread*.05);
       const g=c.createLinearGradient(0,0,h,0);
-      g.addColorStop(0,'rgba(233,95,27,'+(env*.16)+')');g.addColorStop(.7,'rgba(244,129,50,'+(env*.1)+')');g.addColorStop(1,'rgba(255,183,91,0)');
+      g.addColorStop(0,'rgba(233,95,27,'+(env*.16)+')');g.addColorStop(.7,solarPlasma(env*.1));g.addColorStop(1,'rgba(255,183,91,0)');
       c.strokeStyle=g;c.lineWidth=.45+(j%3)*.25;c.beginPath();c.moveTo(-radius*.015,-w);
       c.bezierCurveTo(h*.8,-w*1.4,h*(1+.05*Math.sin(t*.3+j)),w*.8,-radius*.012,w*(.6+spread*.3));c.stroke();
     }

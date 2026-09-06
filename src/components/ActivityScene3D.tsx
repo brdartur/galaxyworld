@@ -3,7 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { PLANETS } from "../data/planets";
 import { SUN_RADIUS_3D } from "../lib/orbitLayout";
-import { ROVER_PLANETS, type ActivitySettings } from "../lib/activitySettings";
+import { SURFACE_ACTOR_SCALE, ROVER_PLANETS, type ActivitySettings } from "../lib/activitySettings";
 import { drawMartianShip, drawRover, drawSolarActivity, drawSurfaceExplorer } from "../lib/activityDrawing";
 
 interface Mission { mode: string; planetIdx: number; t: number }
@@ -73,9 +73,9 @@ export default function ActivityScene3D({ settings, showAstro, mission, planets,
   };
   const roverId = () => ROVER_PLANETS[Math.floor(time.current / 18) % ROVER_PLANETS.length];
   return <>
-    <ActivitySprite draw={c => drawSurfaceExplorer(c, explorerRadius.current, mission.current.t, settings)} place={s =>
+    <ActivitySprite draw={c => drawSurfaceExplorer(c, explorerRadius.current, mission.current.t, settings, SURFACE_ACTOR_SCALE)} place={s =>
       showAstro && mission.current.mode === "explore" && onPlanet(s, PLANETS[mission.current.planetIdx].id, explorerRadius, viewportSize.width < 640 ? .45 : .65)} />
-    <ActivitySprite draw={c => drawRover(c, roverRadius.current, time.current)} place={s =>
+    <ActivitySprite draw={c => drawRover(c, roverRadius.current, time.current, SURFACE_ACTOR_SCALE)} place={s =>
       settings.rovers && time.current % 18 < 16 && onPlanet(s, roverId(), roverRadius, viewportSize.width < 640 ? .4 : .55)} />
     <ActivitySprite draw={c => drawSolarActivity(c, 72, time.current)} place={s => {
       if (!settings.solar) return false;

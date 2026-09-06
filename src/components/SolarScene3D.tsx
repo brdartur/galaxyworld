@@ -1,5 +1,5 @@
 import { orbitRadius3D, SUN_RADIUS_3D } from "../lib/orbitLayout";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Html, Line, OrbitControls } from "@react-three/drei";
@@ -8,7 +8,9 @@ import { getTexture } from "../lib/textures";
 import CosmicEvents3D, { DeepSpace } from "./CosmicEvents3D";
 
 import ActivityScene3D from "./ActivityScene3D";
-import { SURFACE_DURATION, type ActivitySettings } from "../lib/activitySettings";
+import { solarPlasma } from '../lib/solarAppearance';
+import type { ScreenAnchor } from '../lib/radioSignal';
+import { SURFACE_ACTOR_SCALE, SURFACE_DURATION, type ActivitySettings } from "../lib/activitySettings";
 
 const TAU = Math.PI * 2;
 
@@ -26,6 +28,7 @@ function mulberry32(seed: number) {
 }
 
 interface SceneProps {
+  earthAnchor: MutableRefObject<ScreenAnchor | null>;
   activities: ActivitySettings;
   playing: boolean;
   speed: number;
@@ -195,6 +198,9 @@ function SaturnRing({ pr, tex }: { pr: number; tex: THREE.CanvasTexture }) {
 
 /* ---------- система ---------- */
 function System(props: SceneProps) {
+  const screenPoint = useMemo(() => new THREE.Vector3(), []);
+  const screenEdge = useMemo(() => new THREE.Vector3(), []);
+  useEffect(() => () => { props.earthAnchor.current = null; }, [props.earthAnchor]);
   const sim = useRef(props.initialDays);
   const playingRef = useRef(props.playing);
   playingRef.current = props.playing;
@@ -261,8 +267,8 @@ function System(props: SceneProps) {
     return m;
   }, []);
   const ringTex = useMemo(() => ringTexture(), []);
-  const sunGlow = useMemo(() => glowTexture("rgba(255,240,214,0.9)"), []);
-  const sunCorona = useMemo(() => glowTexture("rgba(255,205,140,0.5)"), []);
+  const sunGlow = useMemo(() => glowTexture(solarPlasma(.9)), []);
+  const sunCorona = useMemo(() => glowTexture(solarPlasma(.5)), []);
 
   const beltGeo = useMemo(() => {
     const rnd = mulberry32(777);
@@ -290,7 +296,7 @@ function System(props: SceneProps) {
     sim.current = 0;
   }, [props.resetToken]);
 
-  useFrame((_, dtRaw) => {
+  useFrame(({ camera, size }, dtRaw) => {
     const dt = Math.min(dtRaw, 0.1);
     if (playingRef.current) sim.current += dt * speedRef.current;
     const days = sim.current;
@@ -318,6 +324,15 @@ function System(props: SceneProps) {
         }
         mesh.rotation.y = (rotAcc.current[d.id] ?? 0) * TAU;
       }
+    }
+
+    const earth = groups.current.earth;
+    if (earth) {
+      screenPoint.copy(earth.position).project(camera);
+      screenEdge.set(planetR3(12756) * earth.scale.x, 0, 0).applyQuaternion(camera.quaternion).add(earth.position).project(camera);
+      const radius = Math.hypot((screenEdge.x-screenPoint.x)*size.width/2, (screenEdge.y-screenPoint.y)*size.height/2);
+      props.earthAnchor.current = Math.abs(screenPoint.x) <= 1 && Math.abs(screenPoint.y) <= 1 && Math.abs(screenPoint.z) <= 1
+        ? { x: (screenPoint.x+1)*size.width/2, y: (1-screenPoint.y)*size.height/2, radius } : null;
     }
 
     // Солнце тоже вращается (грануляция ползёт)
@@ -498,7 +513,7 @@ function System(props: SceneProps) {
         }
       } else if (a.mode === "land") {
         const curY = a.pos.y;
-        const groundY = pr + 1.8;
+        const groundY = pr + 1.8 * SURFACE_ACTOR_SCALE;
         if (curY > groundY) {
           a.pos.y = curY - dt * 2.5;
           a.flame = 0.8;
@@ -511,7 +526,7 @@ function System(props: SceneProps) {
         }
       } else if (a.mode === "explore") {
         a.t += dt;
-        a.pos.y = pr + 1.8;
+        a.pos.y = pr + 1.8 * SURFACE_ACTOR_SCALE;
         if (a.t >= a.hold) {
           a.mode = "depart";
           a.t = 0;
@@ -519,7 +534,7 @@ function System(props: SceneProps) {
       } else {
         a.t += dt;
         a.flame = Math.min(1, a.t * 1.5);
-        a.pos.y = pr + 1.8 + a.t * 3;
+        a.pos.y = pr + 1.8 * SURFACE_ACTOR_SCALE + a.t * 3;
         if (a.t >= 1.2) {
           a.mode = "travel";
           a.flyT = 0;
@@ -845,7 +860,7 @@ function System(props: SceneProps) {
       </group>
 
       {/* астронавт на ракете */}
-      <group ref={astroGrp} scale={2}>
+      <group ref={astroGrp} scale={2 * SURFACE_ACTOR_SCALE}>
         {/* Segmented pressure hull, insulated service stage and real landing struts. */}
         <mesh position={[0,.25,0]}>
           <cylinderGeometry args={[.28,.31,1.35,32]} />

@@ -1,9 +1,12 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { CONSTELLATIONS } from "./SolarCanvas";
 import { getTexture } from "../lib/textures";
+
+import { orbitRadius3D } from '../lib/orbitLayout';
+import { boxIntersectsPolygon, type ScreenPoint } from '../lib/screenGeometry';
 
 const TAU = Math.PI * 2;
 
@@ -46,63 +49,56 @@ function FarLabel({ text, sub }: { text: string; sub?: string }) {
 
 /* ================= СОЗВЕЗДИЯ на небесной сфере ================= */
 function Constellations() {
-  const R = 640;
-  const S = 170;
-  const { geoPts, geoSeg } = useMemo(() => {
+  const instances = useMemo(() => {
     const rnd = mulberry32(9090);
-    const pts: number[] = [];
-    const segs: number[] = [];
-    const nInst = 48;
-    for (let i = 0; i < nInst; i++) {
+    return Array.from({ length: 48 }, (_, i) => {
       const c = CONSTELLATIONS[i % CONSTELLATIONS.length];
-      // случайное направление + локальный базис
-      const th = rnd() * TAU;
-      const ph = Math.acos(2 * rnd() - 1);
-      const d = new THREE.Vector3(Math.sin(ph) * Math.cos(th), Math.cos(ph), Math.sin(ph) * Math.sin(th));
-      const up = new THREE.Vector3(0, 1, 0);
-      const right = new THREE.Vector3().crossVectors(d, up);
-      if (right.lengthSq() < 0.01) right.set(1, 0, 0);
-      right.normalize();
-      const upv = new THREE.Vector3().crossVectors(right, d).normalize();
-      const base = d.clone().multiplyScalar(R);
-      const world: [number, number, number][] = c.pts.map(([px, py]) => {
-        const p = base.clone().addScaledVector(right, (px - 0.5) * S).addScaledVector(upv, (0.5 - py) * S);
-        return [p.x, p.y, p.z];
-      });
-      const offset = pts.length / 3;
-      for (const p of world) pts.push(p[0], p[1], p[2]);
-      for (const [a, b] of c.seg) segs.push(...world[a], ...world[b]);
-      void offset;
-    }
-    const gp = new THREE.BufferGeometry();
-    gp.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pts), 3));
-    const gs = new THREE.BufferGeometry();
-    gs.setAttribute("position", new THREE.BufferAttribute(new Float32Array(segs), 3));
-    return { geoPts: gp, geoSeg: gs };
+      const th = rnd() * TAU, ph = Math.acos(2 * rnd() - 1);
+      const d = new THREE.Vector3(Math.sin(ph)*Math.cos(th),Math.cos(ph),Math.sin(ph)*Math.sin(th));
+      const right = new THREE.Vector3().crossVectors(d,new THREE.Vector3(0,1,0));
+      if(right.lengthSq()<.01)right.set(1,0,0); right.normalize();
+      const up = new THREE.Vector3().crossVectors(right,d).normalize();
+      const world = c.pts.map(([x,y])=>d.clone().multiplyScalar(640).addScaledVector(right,(x-.5)*170).addScaledVector(up,(.5-y)*170));
+      const pts = new THREE.BufferGeometry().setFromPoints(world);
+      const seg = new THREE.BufferGeometry().setFromPoints(c.seg.flatMap(([a,b])=>[world[a],world[b]]));
+      return { world, pts, seg };
+    });
   }, []);
-  const matPts = useRef<THREE.PointsMaterial>(null);
-  const matSeg = useRef<THREE.LineBasicMaterial>(null);
-  const sky = useRef<THREE.Group>(null);
-  useFrame(({ clock }, dt) => {
-    const t = clock.elapsedTime;
-    if (matPts.current) matPts.current.opacity = 0.72 + 0.22 * Math.sin(t * 0.6);
-    if (matSeg.current) matSeg.current.opacity = 0.3 + 0.12 * Math.sin(t * 0.45 + 1);
-    /* небесная сфера медленно вращается — созвездия плывут */
-    if (sky.current) {
-      sky.current.rotation.y += dt * 0.0042;
-      sky.current.rotation.x = Math.sin(t * 0.05) * 0.02;
+  const pointMaterial = useMemo(()=>new THREE.PointsMaterial({color:'#d6e4ff',size:2.4,sizeAttenuation:false,transparent:true,opacity:.8,depthWrite:false,fog:false}),[]);
+  const lineMaterial = useMemo(()=>new THREE.LineBasicMaterial({color:'#8fb0e8',transparent:true,opacity:.3,depthWrite:false,fog:false}),[]);
+  const sky=useRef<THREE.Group>(null), groups=useRef<(THREE.Group|null)[]>([]);
+  const temp=useMemo(()=>new THREE.Vector3(),[]);
+  useEffect(()=>()=>{
+    instances.forEach(i=>{i.pts.dispose();i.seg.dispose();});pointMaterial.dispose();lineMaterial.dispose();
+  },[instances,pointMaterial,lineMaterial]);
+  useFrame(({clock,camera,size},dt)=>{
+    if(!sky.current)return;
+    const t=clock.elapsedTime;
+    pointMaterial.opacity=.72+.22*Math.sin(t*.6);lineMaterial.opacity=.3+.12*Math.sin(t*.45+1);
+    sky.current.rotation.y+=dt*.0042;sky.current.rotation.x=Math.sin(t*.05)*.02;
+    sky.current.updateMatrixWorld(true);
+    const polygon: ScreenPoint[]=[];
+    const r=orbitRadius3D(30.05)+4;
+    for(let j=0;j<64;j++){
+      const a=j*TAU/64;temp.set(Math.cos(a)*r,0,Math.sin(a)*r).project(camera);
+      polygon.push([(temp.x+1)*size.width/2,(1-temp.y)*size.height/2]);
     }
+    instances.forEach((inst,i)=>{
+      let left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity,visible=true;
+      for(const p of inst.world){
+        temp.copy(p).applyMatrix4(sky.current!.matrixWorld).project(camera);
+        if(Math.abs(temp.z)>1){visible=false;break;}
+        const x=(temp.x+1)*size.width/2,y=(1-temp.y)*size.height/2;
+        left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);
+      }
+      // Hide the entire distant figure while its projection crosses the orbital disk.
+      // It reappears as the sky rotates into open space; no severed lines inside the system.
+      if(groups.current[i])groups.current[i]!.visible=visible&&!boxIntersectsPolygon({left:left-18,right:right+18,top:top-18,bottom:bottom+18},polygon);
+    });
   });
-  return (
-    <group ref={sky}>
-      <points geometry={geoPts}>
-        <pointsMaterial ref={matPts} color="#d6e4ff" size={2.4} sizeAttenuation={false} transparent opacity={0.8} depthWrite={false} fog={false} />
-      </points>
-      <lineSegments geometry={geoSeg}>
-        <lineBasicMaterial ref={matSeg} color="#8fb0e8" transparent opacity={0.3} depthWrite={false} fog={false} />
-      </lineSegments>
-    </group>
-  );
+  return <group ref={sky}>{instances.map((inst,i)=><group key={i} ref={g=>{groups.current[i]=g;}}>
+    <points geometry={inst.pts} material={pointMaterial}/><lineSegments geometry={inst.seg} material={lineMaterial}/>
+  </group>)}</group>;
 }
 
 /* ================= МЕТЕОРЫ + ЗВЕЗДОПАД ================= */

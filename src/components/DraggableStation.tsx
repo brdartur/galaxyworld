@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { drawStation } from "../lib/activityDrawing";
 import type { ActivitySettings } from "../lib/activitySettings";
+
+import type { ScreenAnchor } from '../lib/radioSignal';
 
 const KEY = "solarsys.stationPosition.v1";
 const clamp = (v: number) => Math.max(0, Math.min(1, v));
@@ -13,7 +15,7 @@ function initialPosition() {
 }
 
 /** Screen-space station stays draggable in either map mode, including touch and keyboard. */
-export default function DraggableStation({ settings }: { settings: ActivitySettings }) {
+export default function DraggableStation({ settings, antenna }: { settings: ActivitySettings; antenna: MutableRefObject<ScreenAnchor | null> }) {
   const [position, setPosition] = useState(initialPosition);
   const [dragging, setDragging] = useState(false);
   const [bounds, setBounds] = useState({ width: 1, height: 1, scale: 1 });
@@ -51,6 +53,12 @@ export default function DraggableStation({ settings }: { settings: ActivitySetti
   }, []);
   const width = 380 * bounds.scale * .7, height = 280 * bounds.scale * .7;
   const rangeX = Math.max(0, bounds.width - width), rangeY = Math.max(0, bounds.height - height);
+  useEffect(() => {
+    // Antenna tip is at (-51,-51) relative to the drawing origin (190,155).
+    antenna.current = settings.station ? { x: position.x * rangeX + width * 139 / 380,
+      y: position.y * rangeY + height * 104 / 280, radius: 0 } : null;
+    return () => { antenna.current = null; };
+  }, [antenna, settings.station, position, rangeX, rangeY, width, height]);
   const endDrag = (id: number) => {
     if (drag.current?.id !== id) return;
     drag.current = null; setDragging(false);
