@@ -36,6 +36,11 @@ function polygon(c: Ctx, points: number[], fill: string) {
 function oval(c: Ctx, x: number, y: number, rx: number, ry: number, color: string) {
   c.fillStyle = color; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill();
 }
+function clamp01(v: number) { return Math.max(0, Math.min(1, v)); }
+function pulse01(v: number, start: number, end: number) {
+  const p = clamp01((v - start) / Math.max(0.0001, end - start));
+  return Math.sin(p * Math.PI);
+}
 
 function stationPanel(c: Ctx, x: number, y: number, w: number, h: number, side: number, open: number, sunlight: number) {
   const fold = 1 - open;
@@ -302,13 +307,13 @@ export function drawStation(c: Ctx, time: number, settings: ActivitySettings) {
   c.restore();
 }
 
-/** Irregular spot groups, fine magnetic filaments and diffuse limb eruptions. */
+/** Irregular active regions, fusion flashes, flare shocks and rupturing magnetic prominences. */
 export function drawSolarActivity(c: Ctx, radius: number, t: number) {
   c.save();
   c.beginPath();c.arc(0,0,radius,0,TAU);c.clip();
-  for(let i=0;i<4;i++){
-    const a=t*.009+i*1.79,x=Math.sin(a)*radius*.78,y=Math.cos(i*2.1)*radius*.4;
-    const foreshorten=Math.max(.15,Math.cos(a));if(Math.cos(a)<0)continue;
+  for(let i=0;i<5;i++){
+    const a=t*.011+i*1.47,x=Math.sin(a)*radius*.78,y=Math.cos(i*2.1+t*.017)*radius*.42;
+    const foreshorten=Math.max(.15,Math.cos(a));if(Math.cos(a)<-.04)continue;
     c.save();c.translate(x,y);c.scale(foreshorten,1);c.rotate(i*1.7);
     // Fine, uneven penumbra surrounding a fragmented umbra.
     for(let j=0;j<30;j++){
@@ -320,21 +325,107 @@ export function drawSolarActivity(c: Ctx, radius: number, t: number) {
     g.addColorStop(0,'rgba(255,239,183,.22)');g.addColorStop(1,'rgba(255,189,76,0)');
     c.fillStyle=g;c.fillRect(-radius*.16,-radius*.18,radius*.38,radius*.36);c.restore();
   }
+  c.globalCompositeOperation='lighter';
+  // Short-lived bright flare ribbons and expanding shock rings on the visible photosphere.
+  for(let i=0;i<6;i++){
+    const phase=(t/(7.5+i*.9)+i*.31)%1;
+    const flash=pulse01(phase,.04,.33)*(1-clamp01((phase-.46)/.22));
+    if(flash<=.01)continue;
+    const a=i*2.17+t*.021,rr=radius*(.18+(i%4)*.15);
+    const x=Math.cos(a)*rr,y=Math.sin(a*1.13+i)*rr*.72;
+    const glow=c.createRadialGradient(x,y,0,x,y,radius*(.14+flash*.16));
+    glow.addColorStop(0,`rgba(255,242,185,${(.38*flash).toFixed(3)})`);
+    glow.addColorStop(.28,solarPlasma(.24*flash));
+    glow.addColorStop(1,'rgba(255,115,36,0)');
+    c.fillStyle=glow;c.fillRect(x-radius*.32,y-radius*.32,radius*.64,radius*.64);
+    c.strokeStyle=solarPlasma(.32*flash);c.lineWidth=1.1+flash*1.8;
+    for(let j=0;j<3;j++){
+      c.beginPath();
+      c.arc(x,y,radius*(.035+j*.045+phase*.06),0,TAU);
+      c.stroke();
+    }
+    for(let j=0;j<9;j++){
+      const b=j*TAU/9+t*.4,len=radius*(.045+flash*.1)*(j%3===0?1.45:1);
+      line(c,[x+Math.cos(b)*radius*.018,y+Math.sin(b)*radius*.018,x+Math.cos(b)*len,y+Math.sin(b)*len],`rgba(255,226,130,${(.22*flash).toFixed(3)})`,.75+flash*.7);
+    }
+  }
+  // Granular "nuclear reaction" flashes under the surface: many tiny kernels ignite and fade.
+  for(let i=0;i<34;i++){
+    const seed=i*12.9898;
+    const phase=(t*(.16+(i%5)*.026)+i*.137)%1;
+    const env=Math.pow(Math.sin(phase*Math.PI),3);
+    const a=seed+t*.006*(i%2?1:-1),rr=radius*(.12+((i*37)%70)/100*.74);
+    const x=Math.cos(a)*rr,y=Math.sin(a*1.31)*rr*.86;
+    const r=radius*(.006+(i%4)*.002)*(1+env*1.9);
+    const g=c.createRadialGradient(x,y,0,x,y,r*5);
+    g.addColorStop(0,`rgba(255,250,203,${(.34*env).toFixed(3)})`);
+    g.addColorStop(.35,solarPlasma(.16*env));
+    g.addColorStop(1,'rgba(255,150,52,0)');
+    c.fillStyle=g;c.beginPath();c.arc(x,y,r*5,0,TAU);c.fill();
+    if(i%7===0&&env>.45){
+      const x2=x+Math.cos(a+1.9)*radius*.055,y2=y+Math.sin(a+1.9)*radius*.04;
+      line(c,[x,y,x2,y2],`rgba(255,230,143,${(.13*env).toFixed(3)})`,.45);
+    }
+  }
   c.restore();c.save();c.globalCompositeOperation='lighter';
   for(let i=0;i<4;i++){
-    const phase=(t/(18+i*5)+i*.23)%1,env=Math.pow(Math.sin(phase*Math.PI),2);
-    c.save();c.rotate(i*2.13+.5);c.translate(radius*.99,0);
-    // Many offset, translucent strands form one plasma structure, without a neon outline.
-    for(let j=0;j<18;j++){
-      const spread=j/17,h=radius*(.1+env*.23)*(1-spread*.3),w=radius*(.07+spread*.05);
-      const g=c.createLinearGradient(0,0,h,0);
-      g.addColorStop(0,'rgba(233,95,27,'+(env*.16)+')');g.addColorStop(.7,solarPlasma(env*.1));g.addColorStop(1,'rgba(255,183,91,0)');
-      c.strokeStyle=g;c.lineWidth=.45+(j%3)*.25;c.beginPath();c.moveTo(-radius*.015,-w);
-      c.bezierCurveTo(h*.8,-w*1.4,h*(1+.05*Math.sin(t*.3+j)),w*.8,-radius*.012,w*(.6+spread*.3));c.stroke();
+    const phase=(t/(21+i*4.5)+i*.18)%1;
+    const grow=smooth(phase/.38);
+    const tear=clamp01((phase-.45)/.18);
+    const fade=1-smooth((phase-.78)/.18);
+    const env=Math.max(.04,fade*(.25+grow*.75));
+    const height=radius*(.18+grow*.34+tear*.18);
+    const width=radius*(.11+i*.012);
+    c.save();c.rotate(i*1.72+.44+Math.sin(t*.04+i)*.08);c.translate(radius*.99,0);
+    // Magnetic loop rooted in the chromosphere. It stretches first, then the top pinches apart.
+    for(let j=0;j<20;j++){
+      const spread=j/19;
+      const off=(spread-.5)*width*(1.25+.25*Math.sin(t*.33+j));
+      const strandAlpha=env*(.07+(j%5)*.018);
+      const g=c.createLinearGradient(0,0,height,0);
+      g.addColorStop(0,`rgba(233,95,27,${(strandAlpha*1.25).toFixed(3)})`);
+      g.addColorStop(.58,solarPlasma(strandAlpha));
+      g.addColorStop(1,'rgba(255,183,91,0)');
+      c.strokeStyle=g;c.lineWidth=.42+(j%4)*.18;
+      c.beginPath();
+      c.moveTo(-radius*.012,-width*.55+off*.18);
+      if(tear<.42){
+        c.bezierCurveTo(height*.62,-width*1.22+off,height*(1.06+.08*Math.sin(t*.24+j)),off,height*.36,width*.72+off*.2);
+      }else{
+        const split=(tear-.42)/.58;
+        c.bezierCurveTo(height*.38,-width*1.1+off,height*(.58+split*.12),-width*.88+off*.4,height*(.72+split*.18),-width*.18+off*.2);
+        c.moveTo(height*(.52+split*.36),width*.18+off*.2);
+        c.bezierCurveTo(height*(.72+split*.55),width*.58+off,height*(.45+split*.35),width*.9+off*.25,radius*.01,width*.56+off*.1);
+      }
+      c.stroke();
     }
-    const g=c.createRadialGradient(0,0,0,0,0,radius*.3);
-    g.addColorStop(0,'rgba(250,144,56,'+(env*.12)+')');g.addColorStop(1,'rgba(250,144,56,0)');
-    c.fillStyle=g;c.fillRect(-radius*.12,-radius*.3,radius*.42,radius*.6);
+    if(tear>.18){
+      const burst=smooth((tear-.18)/.42)*fade;
+      const front=height*(.72+tear*.85);
+      for(let j=0;j<16;j++){
+        const q=(j/16+phase*1.35)%1;
+        const side=(j%2?1:-1);
+        const x=front*q+radius*.12*Math.sin(j*3.1);
+        const y=side*width*(.15+q*.95)+Math.sin(t*1.7+j)*radius*.018;
+        const size=radius*(.012+(j%5)*.004)*(1-q*.38);
+        disc(c,x,y,size,`rgba(255,${148+j%4*18},62,${(burst*(1-q)*.58).toFixed(3)})`);
+        line(c,[x-size*1.3,y,x-radius*(.11+.05*q),y-side*radius*.026],`rgba(255,169,74,${(burst*(1-q)*.32).toFixed(3)})`,.75);
+      }
+      for(let j=0;j<9;j++){
+        const spread=(j-4)/4;
+        const x0=height*(.62+tear*.18),y0=spread*width*.18;
+        const x1=front*(.72+tear*.36),y1=spread*width*(.9+tear*.55)+Math.sin(t*.9+j)*radius*.025;
+        line(c,[x0,y0,(x0+x1)/2,y1*.55,x1,y1],`rgba(255,196,91,${(burst*.2).toFixed(3)})`,.55+j%3*.18);
+      }
+      const shock=c.createRadialGradient(front*.58,0,0,front*.58,0,radius*(.34+tear*.3));
+      shock.addColorStop(0,`rgba(255,214,125,${(.18*burst).toFixed(3)})`);
+      shock.addColorStop(1,'rgba(255,118,44,0)');
+      c.fillStyle=shock;c.fillRect(front*.18,-radius*.48,radius*.9,radius*.96);
+    }
+    const foot=c.createRadialGradient(0,0,0,0,0,radius*.32);
+    foot.addColorStop(0,`rgba(250,144,56,${(env*.14).toFixed(3)})`);
+    foot.addColorStop(1,'rgba(250,144,56,0)');
+    c.fillStyle=foot;c.fillRect(-radius*.12,-radius*.3,radius*.42,radius*.6);
     c.restore();
   }
   c.restore();
