@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Орбитальный монитор Земли — CelesTrak</title>
+<style>
+:root{
+  --bg:#02040a;--panel:rgba(7,12,24,.88);--panel2:rgba(13,21,38,.92);
+  --line:rgba(148,163,184,.22);--text:#f8fafc;--muted:#94a3b8;
+  --accent:#38bdf8;--blue:#60a5fa;--violet:#a78bfa;--amber:#fbbf24;
+  --green:#34d399;--red:#fb7185;--dim:#64748b;
+}
+*{box-sizing:border-box} html,body{width:100%;height:100%;margin:0}
+body{overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;user-select:none}
+button,input,select{font:inherit}
+#canvas-container{position:absolute;inset:0}
+#canvas-container canvas{display:block;width:100%;height:100%}
+.panel{background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(16px);box-shadow:0 12px 44px rgba(0,0,0,.42)}
+.topbar{position:absolute;left:18px;top:18px;right:18px;z-index:20;display:flex;gap:10px;align-items:flex-start;pointer-events:none}
+.brand{padding:12px 14px;border-radius:14px;min-width:250px;pointer-events:auto}
+.brand strong{display:block;font-size:14px;letter-spacing:.02em}
+.brand small{display:block;color:var(--muted);margin-top:4px;font-size:11px;line-height:1.35}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-right:6px}
+.toolbar{margin-left:auto;display:flex;gap:8px;pointer-events:auto}
+.icon-btn,.btn{border:1px solid var(--line);background:rgba(15,23,42,.88);color:var(--text);cursor:pointer;border-radius:11px;min-height:42px;transition:.18s}
+.icon-btn{width:42px;font-size:18px}.btn{padding:0 14px}
+.icon-btn:hover,.btn:hover{border-color:rgba(56,189,248,.55);background:rgba(30,41,59,.95)}
+.btn.primary{background:#0c4a6e;border-color:#0284c7}.btn.active{outline:2px solid rgba(56,189,248,.35)}
+.left-panel{position:absolute;z-index:18;left:18px;top:112px;width:300px;max-height:calc(100% - 220px);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.left-head{padding:14px;border-bottom:1px solid var(--line)}
+.search{width:100%;height:40px;border-radius:10px;border:1px solid var(--line);background:rgba(2,6,23,.8);color:var(--text);padding:0 12px;outline:none;user-select:text}
+.search:focus{border-color:var(--accent)}
+.filter-title{grid-column:1/-1;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:1px 0 2px}
+.filters{padding:12px 14px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.check{display:flex;align-items:center;gap:7px;font-size:12px;color:#dbeafe;cursor:pointer;min-width:0}
+.check span{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.check input{accent-color:var(--accent);flex:0 0 auto}
+.object-filters{padding:10px 14px 12px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr;gap:7px}
+.object-filters .check{font-size:11px}
+.object-filters .swatch{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.object-note{font-size:10px;color:var(--muted);line-height:1.35;margin-top:2px}
+.results{overflow:auto;min-height:0}
+.result{display:block;width:100%;text-align:left;padding:10px 14px;border:0;border-bottom:1px solid rgba(148,163,184,.11);background:transparent;color:var(--text);cursor:pointer}
+.result:hover,.result.selected{background:rgba(56,189,248,.1)}
+.result b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.result span{display:block;margin-top:3px;font-size:10px;color:var(--muted)}
+.empty{padding:18px;color:var(--muted);font-size:12px;line-height:1.45}
+.info-card{position:absolute;z-index:19;right:18px;top:112px;width:330px;max-height:calc(100% - 220px);overflow:auto;border-radius:16px;padding:16px;display:none}
+.info-card.show{display:block}
+.info-top{display:flex;gap:10px;align-items:flex-start}.info-top h2{font-size:17px;margin:3px 0 0;line-height:1.2;flex:1}
+.kicker{font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.08em}
+.close{margin-left:auto;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:18px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.metric{padding:9px 10px;border:1px solid rgba(148,163,184,.14);background:rgba(15,23,42,.5);border-radius:10px}
+.metric small{display:block;color:var(--muted);font-size:10px}.metric b{display:block;margin-top:4px;font-size:13px}
+.meta{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);line-height:1.55}
+.actions{display:flex;gap:8px;margin-top:12px}.actions button{flex:1}
+.controls{position:absolute;z-index:20;bottom:18px;left:50%;transform:translateX(-50%);border-radius:16px;padding:10px;display:flex;align-items:center;gap:10px}
+.speed-wrap{display:flex;align-items:center;gap:8px;min-width:220px;font-size:11px;color:#cbd5e1}
+.speed-wrap input{width:135px;accent-color:var(--accent)}
+.clock{min-width:142px;text-align:center;font-variant-numeric:tabular-nums;font-size:11px;color:#cbd5e1}
+.legend{position:absolute;z-index:17;right:18px;bottom:18px;border-radius:12px;padding:9px 11px;font-size:10px;color:#cbd5e1;display:flex;gap:11px;align-items:center}
+.orbit-guide{position:absolute;z-index:17;right:18px;bottom:62px;width:330px;border-radius:14px;padding:12px 14px;color:#e2e8f0}
+.orbit-guide h3{font-size:12px;margin:0 0 8px;color:#fff}
+.orbit-row{display:grid;grid-template-columns:42px 1fr;gap:8px;padding:5px 0;border-top:1px solid rgba(148,163,184,.09);font-size:10px;line-height:1.35}
+.orbit-row:first-of-type{border-top:0}.orbit-row b{font-size:11px}.orbit-row span{color:var(--muted)}
+.coverage{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:9px;line-height:1.4;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px}
+.toast{position:absolute;left:50%;top:74px;z-index:30;transform:translateX(-50%);padding:9px 12px;border-radius:10px;font-size:11px;display:none}
+.toast.show{display:block}
+#loading{position:absolute;inset:0;z-index:40;background:rgba(2,6,23,.82);display:flex;align-items:center;justify-content:center}
+.loader-card{width:min(420px,calc(100% - 32px));padding:22px;border-radius:18px;text-align:center}
+.loader-card h2{margin:0 0 8px;font-size:17px}.loader-card p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.progress{height:5px;background:rgba(148,163,184,.18);border-radius:999px;margin-top:15px;overflow:hidden}.progress i{display:block;height:100%;width:18%;background:var(--accent);animation:load 1.2s infinite ease-in-out}
+@keyframes load{0%{transform:translateX(-120%)}100%{transform:translateX(620%)}}
+@media(max-width:850px){
+ .brand{min-width:0;max-width:56vw}.left-panel{width:260px}.info-card{width:290px}
+ .legend,.orbit-guide{display:none}.controls{left:12px;right:12px;transform:none;justify-content:center;flex-wrap:wrap}
+}
+@media(max-width:620px){
+ .left-panel{left:10px;right:10px;width:auto;top:96px;max-height:34vh}
+ .info-card{left:10px;right:10px;width:auto;top:auto;bottom:126px;max-height:42vh}
+ .topbar{left:10px;right:10px;top:10px}.brand small{display:none}.toolbar .btn{display:none}
+ .controls{bottom:10px}.speed-wrap{min-width:180px}.clock{display:none}
+}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+<div id="canvas-container"></div>
+
+<div class="topbar">
+  <div class="brand panel">
+    <strong>Орбитальный монитор Земли</strong>
+    <small><span id="statusDot" class="status-dot"></span><span id="sourceStatus">Подключение к CelesTrak…</span><br><span id="catalogStamp">Каталог ещё не загружен</span></small>
+  </div>
+  <div class="toolbar">
+    <button class="btn panel" id="reloadBtn">↻ Обновить каталог</button>
+    <button class="icon-btn panel" id="resetViewBtn" title="Сбросить вид">⌂</button>
+  </div>
+</div>
+
+<aside class="left-panel panel">
+  <div class="left-head"><input id="searchInput" class="search" placeholder="Поиск: ISS, STARLINK, 25544…" autocomplete="off"></div>
+  <div class="filters">
+    <div class="filter-title">Высота / форма орбиты</div>
+    <label class="check"><input id="fLEO" type="checkbox" checked> LEO <span id="nLEO">0</span></label>
+    <label class="check"><input id="fMEO" type="checkbox" checked> MEO <span id="nMEO">0</span></label>
+    <label class="check"><input id="fGEO" type="checkbox" checked> GEO <span id="nGEO">0</span></label>
+    <label class="check"><input id="fHEO" type="checkbox" checked> HEO <span id="nHEO">0</span></label>
+  </div>
+  <div class="object-filters">
+    <div class="filter-title">Что показывать</div>
+    <label class="check"><i class="swatch" style="background:#e2e8f0"></i><input id="fActive" type="checkbox" checked> Активные аппараты <span id="nActive">0</span></label>
+    <label class="check"><i class="swatch" style="background:#94a3b8"></i><input id="fInactive" type="checkbox" checked> Неработающие спутники <span id="nInactive">0</span></label>
+    <label class="check"><i class="swatch" style="background:#f97316"></i><input id="fRocket" type="checkbox" checked> Ступени ракет <span id="nRocket">0</span></label>
+    <label class="check"><i class="swatch" style="background:#64748b"></i><input id="fDebris" type="checkbox" checked> Обломки / мусор <span id="nDebris">0</span></label>
+    <label class="check"><i class="swatch" style="background:#cbd5e1"></i><input id="fUnknown" type="checkbox" checked> Неизвестные <span id="nUnknown">0</span></label>
+    <div class="object-note">Все категории включены по умолчанию. Активные аппараты с GP показаны точно по элементам; остальные SATCAT — яркими различимыми точками с приблизительным положением. Если SATCAT заблокирован браузером, карта прямо помечает резервный слой.</div>
+  </div>
+  <div id="results" class="results"><div class="empty">Загрузка каталога…</div></div>
+</aside>
+
+<section id="infoCard" class="info-card panel" aria-live="polite">
+  <div class="info-top">
+    <div style="min-width:0;flex:1"><div id="satType" class="kicker">Спутник</div><h2 id="satName">—</h2></div>
+    <button id="closeInfo" class="close" title="Закрыть">✕</button>
+  </div>
+  <div class="grid">
+    <div class="metric"><small>Высота</small><b id="satAlt">—</b></div>
+    <div class="metric"><small>Период</small><b id="satPeriod">—</b></div>
+    <div class="metric"><small>Наклонение</small><b id="satInc">—</b></div>
+    <div class="metric"><small>Скорость</small><b id="satSpeed">—</b></div>
+    <div class="metric"><small>Перигей</small><b id="satPerigee">—</b></div>
+    <div class="metric"><small>Апогей</small><b id="satApogee">—</b></div>
+    <div class="metric"><small>Эксцентриситет</small><b id="satEcc">—</b></div>
+    <div class="metric"><small>Размер / RCS</small><b id="satSize">—</b></div>
+  </div>
+  <div id="satMeta" class="meta">—</div>
+  <div class="actions">
+    <button id="followBtn" class="btn primary">Следить</button>
+    <button id="orbitBtn" class="btn">Траектория</button>
+  </div>
+</section>
+
+<div class="controls panel">
+  <button id="playPauseBtn" class="btn primary">Пауза</button>
+  <div class="speed-wrap"><span>Скорость</span><input id="speedRange" type="range" min="0" max="6" step="1" value="2"><b id="speedVal">×60</b></div>
+  <div id="simClock" class="clock">—</div>
+</div>
+
+<div class="orbit-guide panel">
+  <h3>Что означают LEO / MEO / GEO / HEO?</h3>
+  <div class="orbit-row"><b style="color:#60a5fa">LEO</b><span><strong>Низкая орбита</strong> — обычно до 2 000 км. Здесь МКС, Starlink и большинство спутников наблюдения Земли.</span></div>
+  <div class="orbit-row"><b style="color:#a78bfa">MEO</b><span><strong>Средняя орбита</strong> — примерно 2 000–35 000 км. Типичный пример — навигационные GPS, Galileo и ГЛОНАСС.</span></div>
+  <div class="orbit-row"><b style="color:#fbbf24">GEO</b><span><strong>Геостационарная область</strong> — около 35 786 км над экватором. Спутник обращается за сутки и кажется неподвижным над одной точкой Земли.</span></div>
+  <div class="orbit-row"><b style="color:#fb7185">HEO</b><span><strong>Высокоэллиптическая / высокая орбита</strong> — сильно вытянутая либо выше GEO. Аппарат заметно меняет расстояние до Земли.</span></div>
+  <div id="coverageText" class="coverage">Загружаю статистику покрытия каталога…</div>
+</div>
+<div class="legend panel">
+  <span><i class="dot" style="background:#60a5fa"></i>LEO</span>
+  <span><i class="dot" style="background:#a78bfa"></i>MEO</span>
+  <span><i class="dot" style="background:#fbbf24"></i>GEO</span>
+  <span><i class="dot" style="background:#fb7185"></i>HEO</span>
+</div>
+<div id="toast" class="toast panel"></div>
+
+<div id="loading">
+  <div class="loader-card panel">
+    <h2>Загружаю актуальный каталог</h2>
+    <p id="loadingText">Получаю актуальные GP-элементы активных аппаратов и полный SATCAT объектов на орбите. Для объектов без текущих GP положение будет показано приблизительно.</p>
+    <div class="progress"><i></i></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const EARTH_KM = 6371;
+  const SCENE_EARTH_R = 6.371;
+  const ACTIVE_GP_URL = 'https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=JSON';
+  const SATCAT_CSV_URL = 'https://celestrak.org/pub/satcat.csv';
+  const SATCAT_URL = id => `https://celestrak.org/satcat/records.php?CATNR=${encodeURIComponent(id)}&FORMAT=JSON`;
+  const ACTIVE_STATUS = new Set(['+','P','B','S','X']);
+
+  const $ = id => document.getElementById(id);
+  const statusDot=$('statusDot'), sourceStatus=$('sourceStatus'), catalogStamp=$('catalogStamp');
+  const results=$('results'), infoCard=$('infoCard'), toast=$('toast'), loading=$('loading');
+  const filters={LEO:$('fLEO'),MEO:$('fMEO'),GEO:$('fGEO'),HEO:$('fHEO')};
+  const objectFilters={active:$('fActive'),inactive:$('fInactive'),rocket:$('fRocket'),debris:$('fDebris'),unknown:$('fUnknown')};
+  const speedSteps=[0,1,10,60,300,1200,3600];
+  const knownSizes={
+    '25544':'≈ 109 × 73 м','48274':'≈ 55 м','20580':'≈ 13.2 × 4.2 м'
+  };
+
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,2000);
+  camera.position.set(-22,27,52);
+  const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+  renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
+  $('canvas-container').appendChild(renderer.domElement);
+  const controls=new THREE.OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true;controls.dampingFactor=.055;controls.minDistance=8;controls.maxDistance=300;
+
+  // Procedural star field avoids a hard dependency on a remote sky texture.
+  const starCount=2400, starPos=new Float32Array(starCount*3);
+  for(let i=0;i<starCount;i++){const u=Math.random(),v=Math.random(),t=2*Math.PI*u,p=Math.acos(2*v-1),r=520+Math.random()*180;starPos[i*3]=r*Math.sin(p)*Math.cos(t);starPos[i*3+1]=r*Math.sin(p)*Math.sin(t);starPos[i*3+2]=r*Math.cos(p)}
+  const starGeo=new THREE.BufferGeometry();starGeo.setAttribute('position',new THREE.BufferAttribute(starPos,3));
+  scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xffffff,size:.45,transparent:true,opacity:.72,sizeAttenuation:true})));
+
+  const loader=new THREE.TextureLoader();
+  const earthMap=loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg');
+  const earthNormal=loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_normal_2048.jpg');
+  const earthSpec=loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_specular_2048.jpg');
+  scene.add(new THREE.AmbientLight(0x10203a,.75));
+  const sun=new THREE.DirectionalLight(0xffffff,2.5);sun.position.set(70,35,50);scene.add(sun);
+  const earth=new THREE.Mesh(new THREE.SphereGeometry(SCENE_EARTH_R,64,64),new THREE.MeshPhongMaterial({map:earthMap,normalMap:earthNormal,specularMap:earthSpec,specular:0x334455,shininess:22}));
+  scene.add(earth);
+  const atmo=new THREE.Mesh(new THREE.SphereGeometry(SCENE_EARTH_R*1.035,64,64),new THREE.MeshBasicMaterial({color:0x38bdf8,side:THREE.BackSide,transparent:true,opacity:.18,blending:THREE.AdditiveBlending}));
+  scene.add(atmo);
+
+  let catalog=[], pointCloud=null, positions=null, colors=null;
+  let simDate=new Date(), playing=true, speedFactor=60, last=performance.now();
+  let selectedIndex=-1, follow=false, showOrbit=true, orbitLine=null;
+  let filteredSet=null, lastSearch='', pointerDown={x:0,y:0};
+  let activeGPCount=0, satcatOnOrbitCount=0, approximateCount=0, omittedCount=0;
+
+  function classify(alt,ecc){
+    if(ecc>.25) return 'HEO';
+    if(alt<2000) return 'LEO';
+    if(alt>33000 && alt<39000) return 'GEO';
+    if(alt<33000) return 'MEO';
+    return 'HEO';
+  }
+  function semiMajorFromMeanMotion(mm){ return Math.cbrt(398600.4418/Math.pow(mm*2*Math.PI/86400,2)); }
+  function scaleRadius(alt){
+    if(alt<2000) return SCENE_EARTH_R+1+(alt/2000)*3.2;
+    if(alt<30000) return SCENE_EARTH_R+4.2+((alt-2000)/28000)*8.5;
+    return SCENE_EARTH_R+12.8+Math.min(7,(alt-30000)/12000*3.5);
+  }
+  function colorFor(cls,kind='active'){
+    const c=cls==='LEO'?new THREE.Color(0x60a5fa):cls==='MEO'?new THREE.Color(0xa78bfa):cls==='GEO'?new THREE.Color(0xfbbf24):new THREE.Color(0xfb7185);
+    if(kind!=='active') c.multiplyScalar(kind==='rocket'?.92:kind==='unknown'?.95:kind==='inactive'?.82:.72);
+    return c;
+  }
+  function objectKindFromSatcat(o){
+    const t=String(o.OBJECT_TYPE||'').trim().toUpperCase(), st=String(o.OPS_STATUS_CODE||'').trim();
+    if(t==='PAY' && ACTIVE_STATUS.has(st)) return 'active';
+    if(t==='PAY') return 'inactive';
+    if(t==='R/B') return 'rocket';
+    if(t==='DEB') return 'debris';
+    return 'unknown';
+  }
+  function objectKindLabel(k){return k==='active'?'Активный аппарат':k==='inactive'?'Неработающий спутник':k==='rocket'?'Ступень ракеты':k==='debris'?'Обломок / космический мусор':'Неизвестный объект'}
+  function hashNum(v){let h=2166136261;for(const ch of String(v)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+  function parseCSV(text){
+    const rows=[];let row=[],cell='',q=false;
+    for(let i=0;i<text.length;i++){const ch=text[i];if(q){if(ch==='"'&&text[i+1]==='"'){cell+='"';i++}else if(ch==='"')q=false;else cell+=ch}else if(ch==='"')q=true;else if(ch===','){row.push(cell);cell=''}else if(ch==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell=''}else cell+=ch}
+    if(cell||row.length){row.push(cell.replace(/\r$/,''));rows.push(row)}
+    if(!rows.length)return[];const head=rows.shift().map(x=>x.trim());
+    return rows.filter(r=>r.some(Boolean)).map(r=>Object.fromEntries(head.map((h,i)=>[h,r[i]??''])));
+  }
+  function calcDerived(o){
+    const mm=Number(o.MEAN_MOTION)||15, ecc=Math.min(.95,Math.max(0,Number(o.ECCENTRICITY)||0));
+    const a=semiMajorFromMeanMotion(mm), per=a*(1-ecc)-EARTH_KM, apo=a*(1+ecc)-EARTH_KM;
+    const alt=(per+apo)/2, period=1440/mm, speed=Math.sqrt(398600.4418/a);
+    return {mm,ecc,a,per,apo,alt,period,speed,inc:Number(o.INCLINATION)||0,raan:Number(o.RA_OF_ASC_NODE)||0,argp:Number(o.ARG_OF_PERICENTER)||0,mean0:Number(o.MEAN_ANOMALY)||0,epoch:new Date(o.EPOCH||Date.now())};
+  }
+  function makeRecord(o,i){
+    const d=calcDerived(o);
+    return {raw:o,index:i,name:o.OBJECT_NAME||`Объект ${o.NORAD_CAT_ID||i+1}`,id:String(o.NORAD_CAT_ID||''),objectId:o.OBJECT_ID||'',...d,cls:classify(d.alt,d.ecc),kind:'active',precise:true,catalogInfo:null};
+  }
+  function makeSatcatRecord(o,i){
+    const per=Number(o.PERIGEE), apo=Number(o.APOGEE), period=Number(o.PERIOD), inc=Number(o.INCLINATION);
+    if(!Number.isFinite(per)||!Number.isFinite(apo)||!Number.isFinite(period)||period<=0||!Number.isFinite(inc))return null;
+    const a=EARTH_KM+(per+apo)/2, ecc=Math.max(0,Math.min(.95,(apo-per)/(apo+per+2*EARTH_KM))), mm=1440/period;
+    const h=hashNum(o.NORAD_CAT_ID||o.OBJECT_ID||i), h2=hashNum(String(h)+'x');
+    const epoch=new Date();
+    const alt=(per+apo)/2, speed=Math.sqrt(398600.4418/a), kind=objectKindFromSatcat(o);
+    return {raw:o,index:i,name:o.OBJECT_NAME||`Объект ${o.NORAD_CAT_ID||i+1}`,id:String(o.NORAD_CAT_ID||''),objectId:o.OBJECT_ID||'',mm,ecc,a,per,apo,alt,period,speed,inc,raan:(h%36000)/100,argp:(h2%36000)/100,mean0:((h>>>8)%36000)/100,epoch,cls:classify(alt,ecc),kind,precise:false,catalogInfo:o};
+  }
+  function fallbackData(){
+    const base=[
+      {OBJECT_NAME:'ISS (ZARYA)',NORAD_CAT_ID:25544,OBJECT_ID:'1998-067A',EPOCH:new Date().toISOString(),MEAN_MOTION:15.49,ECCENTRICITY:.00045,INCLINATION:51.64,RA_OF_ASC_NODE:72,ARG_OF_PERICENTER:80,MEAN_ANOMALY:280},
+      {OBJECT_NAME:'TIANHE',NORAD_CAT_ID:48274,OBJECT_ID:'2021-035A',EPOCH:new Date().toISOString(),MEAN_MOTION:15.61,ECCENTRICITY:.0007,INCLINATION:41.47,RA_OF_ASC_NODE:210,ARG_OF_PERICENTER:130,MEAN_ANOMALY:70},
+      {OBJECT_NAME:'HST',NORAD_CAT_ID:20580,OBJECT_ID:'1990-037B',EPOCH:new Date().toISOString(),MEAN_MOTION:15.08,ECCENTRICITY:.00025,INCLINATION:28.47,RA_OF_ASC_NODE:190,ARG_OF_PERICENTER:40,MEAN_ANOMALY:160}
+    ];
+    for(let i=0;i<2400;i++){
+      const leo=Math.random()<.82, geo=!leo&&Math.random()<.22;
+      const mm=geo?1.0027:(leo?14.2+Math.random()*2:1.8+Math.random()*3.4);
+      base.push({OBJECT_NAME:(leo?'DEMO LEO ':'DEMO MEO/GEO ')+(i+1),NORAD_CAT_ID:'D'+(i+1),OBJECT_ID:'DEMO',EPOCH:new Date().toISOString(),MEAN_MOTION:mm,ECCENTRICITY:geo?.0002:Math.random()*.03,INCLINATION:geo?Math.random()*2:Math.random()*100,RA_OF_ASC_NODE:Math.random()*360,ARG_OF_PERICENTER:Math.random()*360,MEAN_ANOMALY:Math.random()*360});
+    }
+    return base;
+  }
+
+  function fallbackOtherObjects(startIndex=0){
+    // Резервный визуальный слой на случай, если браузер блокирует SATCAT CSV.
+    // Это НЕ реальные текущие координаты: сохраняются только категории и правдоподобное распределение орбит.
+    const specs=[
+      ['inactive',2910,'OFFLINE INACTIVE'],
+      ['rocket',2295,'OFFLINE R/B'],
+      ['debris',12523,'OFFLINE DEB'],
+      ['unknown',55,'OFFLINE UNK']
+    ];
+    const out=[];
+    let n=startIndex;
+    for(const [kind,count,prefix] of specs){
+      for(let i=0;i<count;i++,n++){
+        const h=hashNum(prefix+'-'+i), u=(h%10000)/10000, v=((h>>>8)%10000)/10000;
+        let alt, ecc, inc;
+        if(u<.76){alt=350+v*1600;ecc=.001+((h>>>16)%800)/100000;inc=((h>>>4)%10500)/100}
+        else if(u<.92){alt=2000+v*28000;ecc=.002+((h>>>16)%1800)/100000;inc=15+((h>>>4)%7000)/100}
+        else if(u<.985){alt=34000+v*3500;ecc=.0001+((h>>>16)%250)/100000;inc=((h>>>4)%1500)/100}
+        else{alt=9000+v*50000;ecc=.3+((h>>>16)%5000)/10000;inc=20+((h>>>4)%9000)/100}
+        const a=EARTH_KM+alt, mm=86400/(2*Math.PI*Math.sqrt(a*a*a/398600.4418)), period=1440/mm;
+        const per=Math.max(120,alt*(1-ecc)), apo=Math.max(per,2*alt-per), speed=Math.sqrt(398600.4418/a);
+        out.push({raw:{},index:n,name:`${prefix} ${i+1}`,id:`SIM-${kind}-${i+1}`,objectId:'',mm,ecc,a,per,apo,alt,period,speed,inc,raan:(h%36000)/100,argp:((h>>>5)%36000)/100,mean0:((h>>>10)%36000)/100,epoch:new Date(),cls:classify(alt,ecc),kind,precise:false,catalogInfo:null,syntheticFallback:true});
+      }
+    }
+    return out;
+  }
+
+  function orbitalPosition(s,date,out){
+    const elapsedDays=(date-s.epoch)/86400000;
+    const M=THREE.MathUtils.degToRad((s.mean0+s.mm*360*elapsedDays)%360);
+    // Solve Kepler with 4 Newton iterations.
+    let E=M;
+    for(let k=0;k<4;k++) E-= (E-s.ecc*Math.sin(E)-M)/(1-s.ecc*Math.cos(E));
+    const nu=2*Math.atan2(Math.sqrt(1+s.ecc)*Math.sin(E/2),Math.sqrt(1-s.ecc)*Math.cos(E/2));
+    const rKm=s.a*(1-s.ecc*Math.cos(E));
+    const alt=Math.max(0,rKm-EARTH_KM), rr=scaleRadius(alt);
+    let x=rr*Math.cos(nu), y=0, z=rr*Math.sin(nu);
+    const arg=THREE.MathUtils.degToRad(s.argp), inc=THREE.MathUtils.degToRad(s.inc), raan=THREE.MathUtils.degToRad(s.raan);
+    let x1=x*Math.cos(arg)-z*Math.sin(arg), z1=x*Math.sin(arg)+z*Math.cos(arg);
+    let y2=-z1*Math.sin(inc), z2=z1*Math.cos(inc);
+    let x3=x1*Math.cos(raan)-z2*Math.sin(raan), z3=x1*Math.sin(raan)+z2*Math.cos(raan);
+    out.set(x3,y2,z3);
+    return out;
+  }
+
+  function buildPointCloud(){
+    if(pointCloud){scene.remove(pointCloud);pointCloud.geometry.dispose();pointCloud.material.dispose()}
+    positions=new Float32Array(catalog.length*3);colors=new Float32Array(catalog.length*3);
+    const p=new THREE.Vector3();
+    catalog.forEach((s,i)=>{orbitalPosition(s,simDate,p);positions[i*3]=p.x;positions[i*3+1]=p.y;positions[i*3+2]=p.z;const c=colorFor(s.cls,s.kind);colors[i*3]=c.r;colors[i*3+1]=c.g;colors[i*3+2]=c.b});
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(positions,3));g.setAttribute('color',new THREE.BufferAttribute(colors,3));
+    const m=new THREE.PointsMaterial({size:.22,vertexColors:true,transparent:true,opacity:.96,sizeAttenuation:true});
+    pointCloud=new THREE.Points(g,m);scene.add(pointCloud);applyVisibility();updateCounts();
+  }
+
+  function updatePositions(){
+    if(!pointCloud)return;const p=new THREE.Vector3();
+    for(let i=0;i<catalog.length;i++){
+      orbitalPosition(catalog[i],simDate,p);
+      positions[i*3]=p.x;positions[i*3+1]=p.y;positions[i*3+2]=p.z;
+    }
+    pointCloud.geometry.attributes.position.needsUpdate=true;
+    if(selectedIndex>=0 && orbitLine && showOrbit) drawSelectedOrbit();
+  }
+
+  function applyVisibility(){
+    if(!pointCloud)return;
+    const query=$('searchInput').value.trim().toUpperCase();
+    const visible=new Set();
+    catalog.forEach((s,i)=>{
+      const categoryOn=filters[s.cls].checked, typeOn=objectFilters[s.kind]?.checked!==false;
+      const matches=!query || s.name.toUpperCase().includes(query) || s.id.includes(query) || s.objectId.toUpperCase().includes(query);
+      const on=categoryOn&&typeOn;
+      if(on&&matches)visible.add(i);
+      const c=on?(matches?colorFor(s.cls,s.kind):new THREE.Color(0x152033)):new THREE.Color(0x020305);
+      colors[i*3]=c.r;colors[i*3+1]=c.g;colors[i*3+2]=c.b;
+    });
+    pointCloud.geometry.attributes.color.needsUpdate=true;filteredSet=visible;renderSearch(query);
+  }
+  function updateCounts(){
+    const orbit={LEO:0,MEO:0,GEO:0,HEO:0}, type={active:0,inactive:0,rocket:0,debris:0,unknown:0};
+    catalog.forEach(s=>{orbit[s.cls]++;type[s.kind]=(type[s.kind]||0)+1});
+    Object.keys(orbit).forEach(k=>$('n'+k).textContent=orbit[k].toLocaleString('ru-RU'));
+    $('nActive').textContent=type.active.toLocaleString('ru-RU');$('nInactive').textContent=type.inactive.toLocaleString('ru-RU');$('nRocket').textContent=type.rocket.toLocaleString('ru-RU');$('nDebris').textContent=type.debris.toLocaleString('ru-RU');$('nUnknown').textContent=type.unknown.toLocaleString('ru-RU');
+  }
+  function renderSearch(query){
+    lastSearch=query;
+    if(!query){results.innerHTML='<div class="empty">Введите название или NORAD ID. На сцене можно нажимать на любую видимую точку. Приглушённые объекты могут иметь приблизительное положение.</div>';return}
+    const found=catalog.filter((s,i)=>filteredSet?.has(i)&& (s.name.toUpperCase().includes(query)||s.id.includes(query)||s.objectId.toUpperCase().includes(query))).slice(0,80);
+    if(!found.length){results.innerHTML='<div class="empty">Ничего не найдено по текущим фильтрам.</div>';return}
+    results.innerHTML=found.map(s=>`<button class="result ${s.index===selectedIndex?'selected':''}" data-index="${s.index}"><b>${escapeHtml(s.name)}</b><span>${escapeHtml(objectKindLabel(s.kind))} · NORAD ${escapeHtml(s.id)} · ${s.cls} · ≈ ${Math.round(s.alt).toLocaleString('ru-RU')} км</span></button>`).join('');
+  }
+  function escapeHtml(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+  async function enrichSatcat(s){
+    if(s.catalogInfo || !/^\d+$/.test(s.id))return;
+    try{
+      const r=await fetch(SATCAT_URL(s.id),{cache:'no-store'});if(!r.ok)throw 0;
+      const j=await r.json();s.catalogInfo=j?.[0]||null;
+      if(selectedIndex===s.index)fillInfo(s);
+    }catch(e){}
+  }
+  function fillInfo(s){
+    $('satName').textContent=s.name;$('satType').textContent=`${objectKindLabel(s.kind)} · ${s.cls} · NORAD ${s.id||'—'}`;
+    $('satAlt').textContent=`≈ ${Math.round(s.alt).toLocaleString('ru-RU')} км`;
+    $('satPeriod').textContent=s.period>=120?`${(s.period/60).toFixed(2)} ч`:`${s.period.toFixed(1)} мин`;
+    $('satInc').textContent=`${s.inc.toFixed(2)}°`;$('satSpeed').textContent=`≈ ${s.speed.toFixed(2)} км/с`;
+    $('satPerigee').textContent=`${Math.round(s.per).toLocaleString('ru-RU')} км`;$('satApogee').textContent=`${Math.round(s.apo).toLocaleString('ru-RU')} км`;
+    $('satEcc').textContent=s.ecc.toFixed(5);
+    const ci=s.catalogInfo;
+    $('satSize').textContent=knownSizes[s.id] || ci?.RCS_SIZE || (ci?.RCS ? `${ci.RCS} м² RCS` : 'нет данных');
+    const parts=[s.objectId&&`COSPAR: ${s.objectId}`,ci?.OBJECT_TYPE&&`Тип SATCAT: ${ci.OBJECT_TYPE}`, (ci?.OWNER||ci?.COUNTRY)&&`Страна/оператор: ${ci.OWNER||ci.COUNTRY}`,ci?.LAUNCH_DATE&&`Запуск: ${ci.LAUNCH_DATE}`,s.syntheticFallback?'Положение: РЕЗЕРВНАЯ ВИЗУАЛИЗАЦИЯ — не реальные координаты':(s.precise?`Эпоха GP: ${s.epoch.toLocaleString('ru-RU')}`:'Положение: приблизительное (из параметров SATCAT, без текущего GP)')].filter(Boolean);
+    $('satMeta').textContent=parts.join(' · ');
+  }
+  function selectSatellite(index,center=true){
+    if(index<0||index>=catalog.length)return;
+    selectedIndex=index;const s=catalog[index];infoCard.classList.add('show');fillInfo(s);enrichSatcat(s);
+    if(center){const p=new THREE.Vector3();orbitalPosition(s,simDate,p);controls.target.copy(p);camera.position.copy(p.clone().normalize().multiplyScalar(18).add(p));controls.update()}
+    if(showOrbit)drawSelectedOrbit();renderSearch(lastSearch);
+  }
+  function drawSelectedOrbit(){
+    if(orbitLine){scene.remove(orbitLine);orbitLine.geometry.dispose();orbitLine.material.dispose();orbitLine=null}
+    if(selectedIndex<0||!showOrbit)return;
+    const s=catalog[selectedIndex],pts=[],tmp=new THREE.Vector3(),base=new Date(simDate);
+    for(let i=0;i<=160;i++){const d=new Date(base.getTime()+s.period*60000*(i/160));orbitalPosition(s,d,tmp);pts.push(tmp.clone())}
+    orbitLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.72}));
+    scene.add(orbitLine);
+  }
+
+  const raycaster=new THREE.Raycaster();raycaster.params.Points.threshold=.42;const mouse=new THREE.Vector2();
+  renderer.domElement.addEventListener('pointerdown',e=>pointerDown={x:e.clientX,y:e.clientY});
+  renderer.domElement.addEventListener('pointerup',e=>{
+    if(Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>5||!pointCloud)return;
+    const r=renderer.domElement.getBoundingClientRect();mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+    raycaster.setFromCamera(mouse,camera);const hits=raycaster.intersectObject(pointCloud);
+    const hit=hits.find(h=>filteredSet?.has(h.index));
+    if(hit)selectSatellite(hit.index,false);
+  });
+
+  function resetView(){follow=false;$('followBtn').textContent='Следить';controls.target.set(0,0,0);camera.position.set(-22,27,52);controls.update()}
+  function showToast(msg){toast.textContent=msg;toast.classList.add('show');clearTimeout(showToast.t);showToast.t=setTimeout(()=>toast.classList.remove('show'),2600)}
+
+  async function loadCatalog(){
+    loading.style.display='flex';$('loadingText').textContent='Получаю активные GP-элементы и полный SATCAT. Если браузер заблокирует SATCAT, резервный слой остальных объектов будет создан локально и явно помечен как приблизительный.';
+    sourceStatus.textContent='Подключение к CelesTrak…';statusDot.style.background='#fbbf24';
+    activeGPCount=0;satcatOnOrbitCount=0;approximateCount=0;omittedCount=0;
+
+    let gp=[], satRows=[], gpError=null, satcatError=null;
+    const gpPromise=fetch(ACTIVE_GP_URL,{cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error('GP HTTP '+r.status);const j=await r.json();if(!Array.isArray(j)||j.length<100)throw new Error('Некорректный GP-каталог');return j});
+    const satPromise=fetch(SATCAT_CSV_URL,{cache:'no-store'}).then(async r=>{if(!r.ok)throw new Error('SATCAT HTTP '+r.status);const t=await r.text();const rows=parseCSV(t);if(rows.length<1000)throw new Error('SATCAT вернул слишком мало записей');return rows});
+    const settled=await Promise.allSettled([gpPromise,satPromise]);
+    if(settled[0].status==='fulfilled') gp=settled[0].value; else gpError=settled[0].reason;
+    if(settled[1].status==='fulfilled') satRows=settled[1].value; else satcatError=settled[1].reason;
+
+    let activeRecords=[];
+    if(gp.length){
+      activeRecords=gp.map(makeRecord);activeGPCount=activeRecords.length;
+    }else{
+      activeRecords=fallbackData().map(makeRecord);
+      activeRecords.forEach(s=>s.syntheticFallback=true);
+    }
+
+    const activeIds=new Set(activeRecords.filter(s=>/^\d+$/.test(s.id)).map(s=>s.id));
+    let extra=[];
+    let usingSyntheticRest=false;
+    if(satRows.length){
+      const onOrbit=satRows.filter(o=>!String(o.DECAY_DATE||'').trim() && (!o.ORBIT_CENTER || String(o.ORBIT_CENTER).trim()==='EA'));
+      satcatOnOrbitCount=onOrbit.length;
+      for(const o of onOrbit){
+        const id=String(o.NORAD_CAT_ID||'').trim();if(activeIds.has(id))continue;
+        const rec=makeSatcatRecord(o,activeRecords.length+extra.length);
+        if(rec){extra.push(rec);approximateCount++}else omittedCount++;
+      }
+    }else{
+      usingSyntheticRest=true;
+      extra=fallbackOtherObjects(activeRecords.length);
+      approximateCount=extra.length;
+    }
+
+    catalog=activeRecords.concat(extra);catalog.forEach((s,i)=>s.index=i);
+    const gpLive=!gpError, catLive=!satcatError;
+    if(gpLive && catLive){
+      sourceStatus.textContent=`CelesTrak · ${catalog.length.toLocaleString('ru-RU')} объектов на карте`;
+      catalogStamp.textContent=`${activeGPCount.toLocaleString('ru-RU')} active GP + ${approximateCount.toLocaleString('ru-RU')} SATCAT · ${new Date().toLocaleString('ru-RU')}`;
+      statusDot.style.background='#34d399';
+      $('coverageText').textContent=`На карте ${catalog.length.toLocaleString('ru-RU')} объектов: ${activeGPCount.toLocaleString('ru-RU')} активных аппаратов с GP и ${approximateCount.toLocaleString('ru-RU')} остальных объектов SATCAT. ${omittedCount?`Ещё ${omittedCount.toLocaleString('ru-RU')} записей не имеют достаточных орбитальных параметров для размещения.`:''}`;
+    }else if(gpLive && !catLive){
+      sourceStatus.textContent=`CelesTrak active + резервный слой остальных`;
+      catalogStamp.textContent=`${activeGPCount.toLocaleString('ru-RU')} реальных active GP + ${extra.length.toLocaleString('ru-RU')} резервных объектов`;
+      statusDot.style.background='#f59e0b';
+      $('coverageText').textContent=`Активные аппараты загружены из CelesTrak. Прямой SATCAT CSV заблокирован/недоступен в этом браузере, поэтому остальные ${extra.length.toLocaleString('ru-RU')} объектов показаны резервным распределением. Их категории соответствуют сводным числам SATCAT, но позиции НЕ являются реальными.`;
+      showToast('SATCAT CSV недоступен — остальные объекты показаны резервным слоем');
+    }else{
+      sourceStatus.textContent='Офлайн-режим · резервная визуализация';
+      catalogStamp.textContent=`${catalog.length.toLocaleString('ru-RU')} объектов в локальной демонстрации`;
+      statusDot.style.background='#fb7185';
+      $('coverageText').textContent='CelesTrak недоступен из этого браузера. Показана локальная демонстрация: категории и количество остальных объектов сохранены, но координаты не являются текущими.';
+      showToast('CelesTrak недоступен — включён полностью локальный режим');
+    }
+    selectedIndex=-1;infoCard.classList.remove('show');buildPointCloud();loading.style.display='none';
+  }
+
+  Object.values(filters).forEach(el=>el.addEventListener('change',applyVisibility));
+  Object.values(objectFilters).forEach(el=>el.addEventListener('change',applyVisibility));
+  $('searchInput').addEventListener('input',applyVisibility);
+  results.addEventListener('click',e=>{const b=e.target.closest('[data-index]');if(b)selectSatellite(Number(b.dataset.index))});
+  $('closeInfo').addEventListener('click',()=>{infoCard.classList.remove('show');selectedIndex=-1;follow=false;if(orbitLine){scene.remove(orbitLine);orbitLine=null}});
+  $('followBtn').addEventListener('click',()=>{follow=!follow;$('followBtn').textContent=follow?'Слежение: вкл':'Следить'});
+  $('orbitBtn').addEventListener('click',()=>{showOrbit=!showOrbit;$('orbitBtn').classList.toggle('active',showOrbit);if(showOrbit)drawSelectedOrbit();else if(orbitLine){scene.remove(orbitLine);orbitLine=null}});
+  $('resetViewBtn').addEventListener('click',resetView);
+  $('reloadBtn').addEventListener('click',loadCatalog);
+  $('playPauseBtn').addEventListener('click',e=>{playing=!playing;e.currentTarget.textContent=playing?'Пауза':'Пуск'});
+  $('speedRange').addEventListener('input',e=>{speedFactor=speedSteps[Number(e.target.value)];$('speedVal').textContent='×'+speedFactor});
+
+  function animate(now){
+    requestAnimationFrame(animate);const dt=Math.min(.05,(now-last)/1000);last=now;controls.update();
+    if(playing&&speedFactor>0){simDate=new Date(simDate.getTime()+dt*1000*speedFactor);earth.rotation.y+=dt*.018*speedFactor/60}
+    // Refresh orbital positions at up to 15 FPS; more than enough for thousands of points.
+    if(!animate.lastUpdate||now-animate.lastUpdate>66){updatePositions();animate.lastUpdate=now}
+    if(follow&&selectedIndex>=0){const p=new THREE.Vector3();orbitalPosition(catalog[selectedIndex],simDate,p);const offset=camera.position.clone().sub(controls.target);controls.target.lerp(p,.18);camera.position.copy(controls.target.clone().add(offset));}
+    $('simClock').textContent=simDate.toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'medium'});
+    renderer.render(scene,camera);
+  }
+  requestAnimationFrame(animate);
+  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+  loadCatalog();
+})();
+</script>
+</body>
+</html>

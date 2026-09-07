@@ -219,22 +219,12 @@ assert.doesNotMatch(fs.readFileSync('src/components/CosmicEvents3D.tsx','utf8'),
 assert.match(source,/\/ 220000/);
 console.log('PASS: constellation count is halved and the 3D protodisk label is hidden');
 
-const satellites=load(path.resolve('src/lib/satelliteOrbits.ts'));
-assert.equal(satellites.SATELLITE_COLORS.LEO,'#60a5fa');
-assert.equal(satellites.SATELLITE_COLORS.MEO,'#a78bfa');
-assert.equal(satellites.SATELLITE_COLORS.GEO,'#fbbf24');
-assert.equal(satellites.SATELLITE_COLORS.HEO,'#fb7185');
-assert.equal(satellites.classifySatellite(420,0.001),'LEO');
-assert.equal(satellites.classifySatellite(20200,0.01),'MEO');
-assert.equal(satellites.classifySatellite(35786,0.0002),'GEO');
-assert.equal(satellites.classifySatellite(12000,0.4),'HEO');
-assert.ok(satellites.EARTH_SATELLITES.length>=12,'inset has enough satellites to show all orbit bands');
-for(const sat of satellites.EARTH_SATELLITES) {
-  const p=satellites.satellitePosition(sat,1234,48);
-  assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y)&&Number.isFinite(p.z));
-  const pts=satellites.orbitSamples(sat,0,48,36);
-  assert.equal(pts.length,37);
-  assert.ok(Math.hypot(pts[0].x-pts.at(-1).x,pts[0].y-pts.at(-1).y)<1e-6,'orbit samples close the highlighted path');
-}
-assert.match(fs.readFileSync('src/components/EarthSatellitesInset.tsx','utf8'),/клик по точке выделяет орбиту/);
-console.log('PASS: Earth satellite inset labels, colors, finite positions and highlighted orbit samples');
+const insetSource=fs.readFileSync('src/components/EarthSatellitesInset.tsx','utf8');
+assert.match(insetSource,/earth-satellites-original\.html/);
+assert.match(insetSource,/Оригинальная модель спутников Земли/);
+assert.ok(fs.existsSync('public/earth-satellites-original.html'));
+const originalHtml=fs.readFileSync('public/earth-satellites-original.html','utf8');
+assert.match(originalHtml,/Орбитальный монитор Земли — CelesTrak/);
+assert.match(originalHtml,/ACTIVE_GP_URL/);
+assert.match(originalHtml,/SATCAT_CSV_URL/);
+console.log('PASS: original EarthGPT satellite model is embedded unchanged as iframe source');
