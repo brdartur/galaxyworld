@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import RadioLink from './components/RadioLink';
 import type { ScreenAnchor } from './lib/radioSignal';
 import DraggableStation from "./components/DraggableStation";
+import EarthSatellitesInset from "./components/EarthSatellitesInset";
 import SolarCanvas from "./components/SolarCanvas";
 import SolarScene3D from "./components/SolarScene3D";
 import ControlBar from "./components/ControlBar";
@@ -35,6 +36,7 @@ export default function App() {
   const [showAstro, setShowAstro] = useState(true);
   const [activities, setActivities] = useState(DEFAULT_ACTIVITIES);
   const toggleActivity = (key: ActivityKey) => setActivities(v => ({ ...v, [key]: !v[key] }));
+  const closeEarthSatellites = () => setActivities(v => ({ ...v, earthSatellites: false }));
   const [messagesOpen, setMessagesOpen] = useState(false);
   const [earthMsg, setEarthMsg] = useState(() => {
     try {
@@ -243,6 +245,7 @@ export default function App() {
 
           <RadioLink enabled={activities.radio && activities.station} station={stationAnchor} earth={earthAnchor} />
           <DraggableStation settings={activities} antenna={stationAnchor} />
+          {activities.earthSatellites && <EarthSatellitesInset onClose={closeEarthSatellites} />}
 
           <MobileChips selectedId={selectedId} hoverId={hoverId} onSelect={inspect} />
           <PlanetRail selectedId={selectedId} hoverId={hoverId} onSelect={inspect} onHover={setHoverId} />

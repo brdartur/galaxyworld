@@ -16,6 +16,8 @@ assert.equal(settings.surfaceMission(25).sampling,true);
 assert.equal(settings.surfaceMission(30).scanning,true);
 assert.equal(settings.surfaceMission(40).visible,false);
 assert.equal(settings.surfaceMission(40).angle,0);
+assert.equal(settings.ACTIVITY_LABELS.earthSatellites,'СПУТНИКИ ЗЕМЛИ');
+assert.equal(settings.DEFAULT_ACTIVITIES.earthSatellites,false);
 assert.equal(new Set(settings.ROVER_PLANETS).size,4);
 assert.ok(!settings.ROVER_PLANETS.includes('sun'));
 const calls=[]; let stack=0;
@@ -216,3 +218,23 @@ assert.match(fs.readFileSync('src/components/CosmicEvents3D.tsx','utf8'),/length
 assert.doesNotMatch(fs.readFileSync('src/components/CosmicEvents3D.tsx','utf8'),/FarLabel text="ПРОТОПЛАНЕТНЫЙ ДИСК"/);
 assert.match(source,/\/ 220000/);
 console.log('PASS: constellation count is halved and the 3D protodisk label is hidden');
+
+const satellites=load(path.resolve('src/lib/satelliteOrbits.ts'));
+assert.equal(satellites.SATELLITE_COLORS.LEO,'#60a5fa');
+assert.equal(satellites.SATELLITE_COLORS.MEO,'#a78bfa');
+assert.equal(satellites.SATELLITE_COLORS.GEO,'#fbbf24');
+assert.equal(satellites.SATELLITE_COLORS.HEO,'#fb7185');
+assert.equal(satellites.classifySatellite(420,0.001),'LEO');
+assert.equal(satellites.classifySatellite(20200,0.01),'MEO');
+assert.equal(satellites.classifySatellite(35786,0.0002),'GEO');
+assert.equal(satellites.classifySatellite(12000,0.4),'HEO');
+assert.ok(satellites.EARTH_SATELLITES.length>=12,'inset has enough satellites to show all orbit bands');
+for(const sat of satellites.EARTH_SATELLITES) {
+  const p=satellites.satellitePosition(sat,1234,48);
+  assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y)&&Number.isFinite(p.z));
+  const pts=satellites.orbitSamples(sat,0,48,36);
+  assert.equal(pts.length,37);
+  assert.ok(Math.hypot(pts[0].x-pts.at(-1).x,pts[0].y-pts.at(-1).y)<1e-6,'orbit samples close the highlighted path');
+}
+assert.match(fs.readFileSync('src/components/EarthSatellitesInset.tsx','utf8'),/клик по точке выделяет орбиту/);
+console.log('PASS: Earth satellite inset labels, colors, finite positions and highlighted orbit samples');

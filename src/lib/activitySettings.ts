@@ -10,6 +10,7 @@ export const ACTIVITY_LABELS = {
   spacewalk: "ВЫХОД В КОСМОС",
   martian: "РАКЕТА МАРСИАНИНА",
   disks: "ПРОТОДИСКИ",
+  earthSatellites: "СПУТНИКИ ЗЕМЛИ",
 } as const;
 
 export type ActivityKey = keyof typeof ACTIVITY_LABELS;
@@ -17,6 +18,7 @@ export type ActivitySettings = Record<ActivityKey, boolean>;
 export const DEFAULT_ACTIVITIES: ActivitySettings = {
   drilling: true, research: true, rovers: true, solar: true,
   radio: true, station: true, stationCrew: true, stationRepair: true, spacewalk: true, martian: true, disks: true,
+  earthSatellites: false,
 };
 export const SURFACE_ACTOR_SCALE = .7;
 export const SURFACE_DURATION = 40;
