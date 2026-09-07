@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { PLANETS } from "../data/planets";
-import { SUN_RADIUS_3D } from "../lib/orbitLayout";
+import { PLANET_RADIUS_3D, SUN_RADIUS_3D } from "../lib/orbitLayout";
 import { SURFACE_ACTOR_SCALE, ROVER_PLANETS, type ActivitySettings } from "../lib/activitySettings";
 import { drawMartianShip, drawRover, drawSolarActivity, drawSurfaceExplorer } from "../lib/activityDrawing";
 
@@ -55,7 +55,7 @@ export default function ActivityScene3D({ settings, showAstro, mission, planets,
   const roverRadius = useRef(64);
   const radius = (id: string) => {
     const p = PLANETS.find(p => p.id === id)!;
-    return (0.24 + Math.sqrt(p.diameterKm / 142984) * 1.5) * 2 * .75 * (planets.current[id]?.scale.x ?? 1);
+    return PLANET_RADIUS_3D(p.diameterKm) * (planets.current[id]?.scale.x ?? 1);
   };
   const onPlanet = (sprite: THREE.Sprite, id: string, drawingRadius: MutableRefObject<number>, minPixelScale: number) => {
     const planet = planets.current[id]; if (!planet) return false;

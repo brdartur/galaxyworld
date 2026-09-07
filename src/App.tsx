@@ -15,10 +15,13 @@ import MessagesEditor, { DEFAULT_EARTH_MSG, DEFAULT_MARS_MSGS } from "./componen
 import { DEFAULT_ACTIVITIES, type ActivityKey } from "./lib/activitySettings";
 
 const ORDER = [SUN.id, ...PLANETS.map((p) => p.id)];
+const MIN_SPEED = 0.5;
+const MAX_SPEED = 365;
+const formatSpeed = (value: number) => Number.isInteger(value) ? String(value) : value.toLocaleString("ru-RU", { maximumFractionDigits: 1 });
 
 export default function App() {
   const [playing, setPlaying] = useState(true);
-  const [speed, setSpeed] = useState(15); // симуляционных суток за 1 секунду
+  const [speed, setSpeed] = useState(MIN_SPEED); // симуляционных суток за 1 секунду
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [showOrbits, setShowOrbits] = useState(true);
@@ -121,9 +124,9 @@ export default function App() {
       } else if (e.code === "Escape") {
         setSelectedId(null);
       } else if (e.code === "ArrowRight") {
-        setSpeed((s) => Math.min(365, s + Math.max(1, Math.round(s * 0.2))));
+        setSpeed((s) => s < 1 ? 1 : Math.min(MAX_SPEED, s + Math.max(1, Math.round(s * 0.2))));
       } else if (e.code === "ArrowLeft") {
-        setSpeed((s) => Math.max(1, s - Math.max(1, Math.round(s * 0.2))));
+        setSpeed((s) => s <= 1 ? MIN_SPEED : Math.max(MIN_SPEED, s - Math.max(1, Math.round(s * 0.2))));
       } else if (e.code === "Digit0" || e.code === "Numpad0") {
         inspect(SUN.id);
       } else if (/^Digit[1-8]$/.test(e.code) || /^Numpad[1-8]$/.test(e.code)) {
@@ -185,7 +188,7 @@ export default function App() {
               T+&nbsp;<span className="font-medium text-ink">{fmtElapsed(elapsed)}</span>
             </div>
             <div className="hidden rounded-md border border-line bg-space-900 px-2.5 py-1.5 font-mono text-[11px] text-dim sm:block">
-              <span className="text-amber">×{speed}</span>&nbsp;·&nbsp;{speed}&nbsp;сут/с
+              <span className="text-amber">×{formatSpeed(speed)}</span>&nbsp;·&nbsp;{formatSpeed(speed)}&nbsp;сут/с
             </div>
           </div>
         </header>
@@ -273,15 +276,6 @@ export default function App() {
           </div>
 
           {/* служебные подписи */}
-          <div className="pointer-events-none absolute right-3 bottom-20 z-10 hidden text-right font-mono text-[9.5px] leading-relaxed tracking-[0.14em] text-faint lg:block xl:bottom-4">
-            КЛИК ПО ОБЪЕКТУ — ИССЛЕДОВАНИЕ
-            <br />
-            КЛИК ПО ОРБИТЕ — ЗАКРЕПИТЬ ВЫДЕЛЕНИЕ
-            <br />
-            КОЛЕСО — МАСШТАБ · ПЕРЕТАСКИВАНИЕ — СДВИГ
-            <br />
-            SPACE — ПАУЗА · V — 2D/3D · B — ФОН · 1–8 — ПЛАНЕТЫ
-          </div>
           <div className="pointer-events-none absolute bottom-4 left-4 z-10 hidden font-mono text-[9.5px] leading-relaxed tracking-[0.14em] text-faint xl:block">
             РАССТОЯНИЯ И РАЗМЕРЫ
             <br />

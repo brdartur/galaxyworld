@@ -1,13 +1,17 @@
 import { ACTIVITY_LABELS, type ActivitySettings, type ActivityKey } from "../lib/activitySettings";
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+const MIN_SPEED = 0.5;
+const MAX_SPEED = 365;
+const LOG_RANGE = Math.log(MAX_SPEED / MIN_SPEED);
+const formatSpeed = (value: number) => Number.isInteger(value) ? String(value) : value.toLocaleString("ru-RU", { maximumFractionDigits: 1 });
 
 interface Props {
   activities: ActivitySettings;
   onToggleActivity: (key: ActivityKey) => void;
   playing: boolean;
   onTogglePlay: () => void;
-  speed: number; // 1..365 симуляционных суток в секунду
+  speed: number; // 0.5..365 симуляционных суток в секунду
   onSpeed: (v: number) => void;
   showOrbits: boolean;
   showLabels: boolean;
@@ -26,8 +30,6 @@ interface Props {
   onToggleAstro: () => void;
   onOpenMessages: () => void;
 }
-
-const LOG365 = Math.log(365);
 
 export default function ControlBar({
   activities,
@@ -53,7 +55,7 @@ export default function ControlBar({
   onToggleAstro,
   onOpenMessages,
 }: Props) {
-  const pos = Math.round((Math.log(Math.max(1, speed)) / LOG365) * 1000);
+  const pos = Math.round((Math.log(Math.max(MIN_SPEED, speed) / MIN_SPEED) / LOG_RANGE) * 1000);
 
   return (
     <div aria-label="Панель управления" className="map-control-panel pointer-events-auto flex max-w-[94vw] flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-lg border border-line bg-space-900/85 px-3.5 py-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-md">
@@ -110,7 +112,7 @@ export default function ControlBar({
       {/* ползунок скорости */}
       <div className="flex items-center gap-2.5">
         <span className="font-mono text-[10px] tracking-[0.18em] text-faint">СКОРОСТЬ</span>
-        <span className="font-mono text-[10px] text-faint">×1</span>
+        <span className="font-mono text-[10px] text-faint">×0,5</span>
         <input
           type="range"
           min={0}
@@ -119,7 +121,8 @@ export default function ControlBar({
           value={pos}
           onChange={(e) => {
             const v = Number(e.target.value);
-            onSpeed(clamp(Math.round(Math.pow(365, v / 1000)), 1, 365));
+            const raw = MIN_SPEED * Math.pow(MAX_SPEED / MIN_SPEED, v / 1000);
+            onSpeed(clamp(raw < 1 ? Number(raw.toFixed(1)) : Math.round(raw), MIN_SPEED, MAX_SPEED));
           }}
           aria-label="Скорость симуляции (суток в секунду)"
           title="Скорость симуляции"
@@ -127,7 +130,7 @@ export default function ControlBar({
         />
         <span className="font-mono text-[10px] text-faint">×365</span>
         <span className="min-w-[86px] rounded-md border border-line bg-space-850 px-2 py-1 text-center font-mono text-[11px]">
-          <span className="font-semibold text-amber">×{speed}</span>
+          <span className="font-semibold text-amber">×{formatSpeed(speed)}</span>
           <span className="text-dim"> сут/с</span>
         </span>
       </div>

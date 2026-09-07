@@ -73,10 +73,10 @@ const bodies=load(path.resolve('src/data/planets.ts')).PLANETS;
     previous=radii[i];previousExtent=extent;
   });
 }
-let previous=0,previousExtent=2.6;
+let previous=0,previousExtent=geometry.SUN_RADIUS_3D;
 bodies.forEach(p=>{
   const r=geometry.orbitRadius3D(p.distAU);
-  const extent=(.24+Math.sqrt(p.diameterKm/142984)*1.5)*2*1.28*(p.ring?2.6:1);
+  const extent=geometry.PLANET_RADIUS_3D(p.diameterKm)*1.28*(p.ring?2.6:1);
   assert.ok(r>=2*(7+Math.sqrt(p.distAU)*4.1),'3D orbit at least doubled');
   assert.ok(r-previous>=previousExtent+extent+1.999,'3D rings retain clearance');
   previous=r;previousExtent=extent;
@@ -115,7 +115,7 @@ const start=source.indexOf('    const stepAstronaut =');
 const end=source.indexOf('    /** пузырь',start);
 const step=ts.transpile(source.slice(start,end)).replace('const stepAstronaut','var stepAstronaut');
 for(const fps of [30,60,120]) {
-  const PLANETS=Array.from({length:8},(_,i)=>({id:String(i)}));
+  const PLANETS=Array.from({length:8},(_,i)=>({id:i===2?'earth':String(i)}));
   const placed=[{id:'sun',x:400,y:300,r:50},...PLANETS.map((p,i)=>({...p,x:100+i*70,y:350,r:15+i}))];
   const astronaut={mode:'idle',targetIdx:0,t:0,hold:40,drill:0,flyT:0,fromX:0,fromY:0,x:-9999,y:-9999,angle:0,leaveT:3};
   const context=vm.createContext({PLANETS,placed,astronaut,SUN:{id:'sun'},cx:400,cy:300,SURFACE_DURATION:40,easeInOut:settings.smooth,activityScale:()=>1});
@@ -126,6 +126,7 @@ for(const fps of [30,60,120]) {
     const before=astronaut.mode, fromY=astronaut.fromY;
     context.stepAstronaut(1/fps); modes.add(astronaut.mode);
     assert.ok(Number.isFinite(astronaut.x)&&Number.isFinite(astronaut.y));
+    assert.notEqual(PLANETS[astronaut.targetIdx].id,'earth','astronaut lander skips Earth');
     if(before==='surface'&&astronaut.mode==='surface') {
       const target=placed[astronaut.targetIdx+1];
       assert.equal(astronaut.x,target.x); assert.equal(astronaut.y,target.y-target.r-24);
@@ -197,14 +198,21 @@ assert.ok(screen.boxIntersectsPolygon({left:-150,right:150,top:-5,bottom:5},diam
 assert.ok(!screen.boxIntersectsPolygon({left:70,right:90,top:70,bottom:90},diamond),'sky remains visible in free corners outside the projected orbit');
 const radio=load(path.resolve('src/lib/radioSignal.ts'));
 const station={x:20,y:30,radius:0},earth={x:400,y:200,radius:26};
+assert.equal(radio.radioPulseEnvelope(3),0,'radio link has a silent gap between packets');
 for(const offset of [0,120,-70]) {
   const start={...station,x:station.x+offset},end={...earth,y:earth.y+offset};
   const beam=radio.radioPath(start,end);
   assert.equal(beam.x,start.x);assert.equal(beam.y,start.y);
   assert.ok(Math.abs(Math.hypot(beam.endX-end.x,beam.endY-end.y)-end.radius)<1e-8,'beam terminates at the moving Earth surface');
   for(let t=0;t<20;t+=.1){radio.drawRadioSignal(ctx,start,end,t);assert.equal(stack,0);calls.length=0;}
+  radio.drawRadioSignal(ctx,start,end,3);assert.equal(calls.length,0,'silent radio phase draws no permanent beam');
 }
 assert.equal(radio.radioPath(null,earth),null);
 assert.equal(radio.radioPath(station,null),null);
 assert.equal(radio.radioPath(station,{...station,radius:20}),null);
 console.log('PASS: constellation exclusion, projected 3D sky and moving station-to-Earth radio signal');
+
+assert.match(fs.readFileSync('src/components/CosmicEvents3D.tsx','utf8'),/length:\s*24/);
+assert.doesNotMatch(fs.readFileSync('src/components/CosmicEvents3D.tsx','utf8'),/FarLabel text="ПРОТОПЛАНЕТНЫЙ ДИСК"/);
+assert.match(source,/\/ 220000/);
+console.log('PASS: constellation count is halved and the 3D protodisk label is hidden');

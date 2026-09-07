@@ -1,4 +1,4 @@
-import { orbitRadius3D, SUN_RADIUS_3D } from "../lib/orbitLayout";
+import { orbitRadius3D, PLANET_RADIUS_3D, SUN_RADIUS_3D } from "../lib/orbitLayout";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame } from "@react-three/fiber";
@@ -152,8 +152,13 @@ function bandTexture(): THREE.CanvasTexture {
 
 /* ---------- масштаб ---------- */
 export const orbitR3 = orbitRadius3D;
-const planetR3 = (km: number) => (0.24 + Math.sqrt(km / 142984) * 1.5) * 2 * .75;
+const planetR3 = PLANET_RADIUS_3D;
 const SUN_R = SUN_RADIUS_3D;
+const ASTRO_TARGET_INDICES = PLANETS.map((p, i) => p.id === "earth" ? -1 : i).filter(i => i >= 0);
+const nextAstroTargetIndex = (current = -1) => {
+  const options = ASTRO_TARGET_INDICES.filter(i => i !== current);
+  return options[Math.floor(Math.random() * options.length)] ?? ASTRO_TARGET_INDICES[0] ?? 0;
+};
 
 function OrbitRing({ r, tone }: { r: number; tone: "sel" | "hov" | "plain" }) {
   const pts = useMemo(() => {
@@ -490,6 +495,7 @@ function System(props: SceneProps) {
     /* астронавт: летает между планетами, приземляется, исследует, бурит */
     if (astroGrp.current) {
       const a = astroSM.current;
+      if (PLANETS[a.planetIdx]?.id === "earth") a.planetIdx = nextAstroTargetIndex(a.planetIdx);
       const pIdx = a.planetIdx % PLANETS.length;
       const d = PLANETS[pIdx];
       const ang = d.angle0 + TAU * (days / d.periodDays);
@@ -539,7 +545,7 @@ function System(props: SceneProps) {
           a.mode = "travel";
           a.flyT = 0;
           a.from.copy(a.pos);
-          a.planetIdx = (a.planetIdx + 1) % PLANETS.length;
+          a.planetIdx = nextAstroTargetIndex(a.planetIdx);
           a.t = 0;
         }
       }

@@ -36,22 +36,11 @@ function glowTex(color: string): THREE.CanvasTexture {
   return new THREE.CanvasTexture(c);
 }
 
-function FarLabel({ text, sub }: { text: string; sub?: string }) {
-  return (
-    <Html center zIndexRange={[20, 0]}>
-      <div className="pointer-events-none rounded border border-line bg-space-900/85 px-2.5 py-1 text-center font-mono whitespace-nowrap backdrop-blur-sm">
-        <div className="text-[10px] font-semibold tracking-[0.2em] text-ink/90">{text}</div>
-        {sub && <div className="mt-0.5 text-[8px] tracking-[0.12em] text-faint">{sub}</div>}
-      </div>
-    </Html>
-  );
-}
-
 /* ================= СОЗВЕЗДИЯ на небесной сфере ================= */
 function Constellations() {
   const instances = useMemo(() => {
     const rnd = mulberry32(9090);
-    return Array.from({ length: 48 }, (_, i) => {
+    return Array.from({ length: 24 }, (_, i) => {
       const c = CONSTELLATIONS[i % CONSTELLATIONS.length];
       const th = rnd() * TAU, ph = Math.acos(2 * rnd() - 1);
       const d = new THREE.Vector3(Math.sin(ph)*Math.cos(th),Math.cos(ph),Math.sin(ph)*Math.sin(th));
@@ -398,7 +387,6 @@ function ProtoDisk({ enabled }: { enabled: boolean }) {
         <ringGeometry args={[5.6, 17.5, 64]} />
         <meshBasicMaterial color="#8a6f4d" transparent opacity={0.14} side={THREE.DoubleSide} depthWrite={false} fog={false} />
       </mesh>
-      <FarLabel text="ПРОТОПЛАНЕТНЫЙ ДИСК" sub="здесь рождаются планеты" />
     </group>
   );
 }

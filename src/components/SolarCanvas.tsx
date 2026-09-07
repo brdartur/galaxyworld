@@ -671,12 +671,16 @@ export default function SolarCanvas(props: Props) {
     /* ================= астронавт: выбор цели, полёт, посадка, бурение ================= */
     const activityScale = () => clamp(Math.min(W, H) / 900, .45, 1) * SURFACE_ACTOR_SCALE;
     const stepAstronaut = (d: number) => {
+      const nextAstroTarget = (current = -1) => {
+        const options = PLANETS.map((p, i) => p.id === "earth" || i === current ? -1 : i).filter(i => i >= 0);
+        return options[Math.floor(Math.random() * options.length)] ?? 0;
+      };
       const a = astronaut;
 
       // Первый полёт начинается сразу, чтобы включённый астронавт был виден.
       if (a.mode === "idle") {
         a.mode = "toPlanet";
-        a.targetIdx = Math.floor(Math.random() * PLANETS.length);
+        a.targetIdx = nextAstroTarget();
         a.flyT = 0;
         a.fromX = cx;
         a.fromY = cy - (placed.find((body) => body.id === SUN.id)?.r ?? 20) - 40;
@@ -739,7 +743,7 @@ export default function SolarCanvas(props: Props) {
           a.flyT = 0;
           a.fromX = a.x;
           a.fromY = a.y;
-          a.targetIdx = (a.targetIdx + 1 + Math.floor(Math.random() * (PLANETS.length - 1))) % PLANETS.length;
+          a.targetIdx = nextAstroTarget(a.targetIdx);
           a.t = 0;
         }
       }
@@ -1392,7 +1396,7 @@ export default function SolarCanvas(props: Props) {
       renderBg(curBgTheme);
 
       /* дрейфующие созвездия */
-      const nC = clamp(Math.round((W * H) / 110000), 5, 9);
+      const nC = clamp(Math.round((W * H) / 220000), 3, 5);
       const cr2 = mulberry32(5150);
       cInsts = Array.from({ length: nC }, () => ({
         c: Math.floor(cr2() * CONSTELLATIONS.length),
@@ -1406,7 +1410,7 @@ export default function SolarCanvas(props: Props) {
         glow: 0,
       }));
       // несколько дополнительных — справа, в свободной зоне за орбитами
-      for (let ic = 0; ic < 6; ic++) {
+      for (let ic = 0; ic < 3; ic++) {
         cInsts.push({
           c: Math.floor(cr2() * CONSTELLATIONS.length),
           x: W * (0.62 + cr2() * 0.36),

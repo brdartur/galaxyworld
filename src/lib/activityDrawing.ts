@@ -37,6 +37,39 @@ function oval(c: Ctx, x: number, y: number, rx: number, ry: number, color: strin
   c.fillStyle = color; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill();
 }
 
+function stationPanel(c: Ctx, x: number, y: number, w: number, h: number, side: number, open: number, sunlight: number) {
+  const fold = 1 - open;
+  const visibleH = h * (0.22 + open * 0.78);
+  c.save();
+  c.translate(x + w / 2, y + h / 2);
+  c.rotate(side * fold * 0.55);
+  c.scale(1, 0.34 + open * 0.66);
+  const yy = -visibleH / 2;
+  metal(c, -w / 2 - 1, yy, w + 2, visibleH, true);
+  for (let band = 0; band < 2; band++) {
+    const by = yy + band * visibleH * .52;
+    const bh = visibleH * .43;
+    const g = c.createLinearGradient(-w / 2, by, w / 2, by + bh);
+    g.addColorStop(0, `rgba(20,42,58,${(.92 + sunlight * .08).toFixed(3)})`);
+    g.addColorStop(.48, `rgba(${34 + sunlight * 42},${58 + sunlight * 48},${82 + sunlight * 60},.98)`);
+    g.addColorStop(1, '#101f31');
+    c.fillStyle = g;
+    c.fillRect(-w / 2, by, w, bh);
+    for (let col = 0; col < 4; col++) {
+      for (let row = 0; row < 12; row++) {
+        c.fillStyle = (col + row) % 3 === 0 ? '#29415f' : '#1d2e47';
+        c.fillRect(-w / 2 + col * 8 + .5, by + row * (bh / 12) + .5, 6.8, Math.max(1.6, bh / 12 - 1.1));
+      }
+    }
+    for (let j = 0; j <= 4; j++) line(c, [-w / 2 + j * 8, by, -w / 2 + j * 8, by + bh], '#b0a77c', .35);
+    line(c, [-w / 2, by, w / 2, by], `rgba(255,231,142,${(.45 + sunlight * .45).toFixed(3)})`, .8);
+  }
+  c.globalAlpha *= sunlight * open * .28;
+  c.fillStyle = '#ffd46c';
+  c.fillRect(-w / 2, yy, w, visibleH);
+  c.restore();
+}
+
 /** Adult EVA proportions, layered fabric, pressure joints and reflective visor. Feet at origin. */
 export function drawSuit(c: Ctx, t: number, walking = false, working = false, sample = false) {
   const stride = walking ? Math.sin(t * 6) * 4 : 0;
@@ -171,22 +204,33 @@ export function drawRover(c: Ctx, radius: number, time: number, artScale = 1) {
 
 export function drawStation(c: Ctx, time: number, settings: ActivitySettings) {
   c.save();
+  const cycle = time % 38;
+  const open = cycle < 13 ? 1 : cycle < 19 ? 1 - smooth((cycle - 13) / 6) : cycle < 25 ? .12 : cycle < 32 ? .12 + smooth((cycle - 25) / 7) * .88 : 1;
+  const sunlight = .5 + .5 * Math.sin(time * .42);
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 4; i++) {
+    const y = -58 + i * 34 + Math.sin(time * .8 + i) * 2;
+    const alpha = (.08 + sunlight * .08) * open;
+    const g = c.createLinearGradient(-240, y, 190, y + 18);
+    g.addColorStop(0, `rgba(255,188,75,${alpha.toFixed(3)})`);
+    g.addColorStop(.45, `rgba(255,224,132,${(alpha * .65).toFixed(3)})`);
+    g.addColorStop(1, 'rgba(255,224,132,0)');
+    c.strokeStyle = g;
+    c.lineWidth = 1.2 + sunlight * 1.1;
+    c.beginPath();
+    c.moveTo(-240, y);
+    c.lineTo(190, y + 18);
+    c.stroke();
+  }
+  c.restore();
   // ISS-inspired lattice truss, four photovoltaic wings and pressure modules.
   metal(c,-153,-3,306,7,true);
   for(let x=-150;x<150;x+=12){line(c,[x,-4,x+12,4,x+12,-4],'#9babae',.8);}
   for(const side of [-1,1]){
     for(const offset of [88,130]){
       const x=side*offset-16;
-      metal(c,x-1,-65,34,128,true);
-      for(const y of [-63,7]){
-        const g=c.createLinearGradient(x,y,x+32,y+54);g.addColorStop(0,'#172735');g.addColorStop(.5,'#384450');g.addColorStop(1,'#101f31');
-        c.fillStyle=g;c.fillRect(x,y,32,54);
-        for(let col=0;col<4;col++)for(let row=0;row<12;row++){
-          c.fillStyle=(col+row)%3===0?'#263951':'#1d2e47';c.fillRect(x+col*8+.5,y+row*4.5+.5,6.8,3.4);
-        }
-        for(let j=0;j<=4;j++)line(c,[x+j*8,y,x+j*8,y+54],'#b0a77c',.35);
-        line(c,[x,y,x+32,y],'#d6cfa6',.8);
-      }
+      stationPanel(c, x, -65, 32, 128, side, open, sunlight);
     }
     // White thermal radiators, offset behind the central structure.
     for(let j=0;j<3;j++){
