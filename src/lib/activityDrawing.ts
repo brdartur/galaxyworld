@@ -36,12 +36,6 @@ function polygon(c: Ctx, points: number[], fill: string) {
 function oval(c: Ctx, x: number, y: number, rx: number, ry: number, color: string) {
   c.fillStyle = color; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill();
 }
-function clamp01(v: number) { return Math.max(0, Math.min(1, v)); }
-function pulse01(v: number, start: number, end: number) {
-  const p = clamp01((v - start) / Math.max(0.0001, end - start));
-  return Math.sin(p * Math.PI);
-}
-
 function stationPanel(c: Ctx, x: number, y: number, w: number, h: number, side: number, open: number, sunlight: number) {
   const fold = 1 - open;
   const visibleH = h * (0.22 + open * 0.78);
@@ -307,7 +301,7 @@ export function drawStation(c: Ctx, time: number, settings: ActivitySettings) {
   c.restore();
 }
 
-/** Irregular active regions, fusion flashes, flare shocks and rupturing magnetic prominences. */
+/** Irregular active regions, tiny fusion glints and restrained magnetic prominences. */
 export function drawSolarActivity(c: Ctx, radius: number, t: number) {
   c.save();
   c.beginPath();c.arc(0,0,radius,0,TAU);c.clip();
@@ -326,28 +320,20 @@ export function drawSolarActivity(c: Ctx, radius: number, t: number) {
     c.fillStyle=g;c.fillRect(-radius*.16,-radius*.18,radius*.38,radius*.36);c.restore();
   }
   c.globalCompositeOperation='lighter';
-  // Short-lived bright flare ribbons and expanding shock rings on the visible photosphere.
-  for(let i=0;i<6;i++){
-    const phase=(t/(7.5+i*.9)+i*.31)%1;
-    const flash=pulse01(phase,.04,.33)*(1-clamp01((phase-.46)/.22));
-    if(flash<=.01)continue;
-    const a=i*2.17+t*.021,rr=radius*(.18+(i%4)*.15);
+  // Small transient flare kernels stay close to the photosphere texture.
+  for(let i=0;i<8;i++){
+    const phase=(t*(.18+i*.013)+i*.31)%1;
+    const flash=Math.pow(Math.sin(phase*Math.PI),5);
+    if(flash<=.08)continue;
+    const a=i*2.17+t*.018,rr=radius*(.16+(i%4)*.16);
     const x=Math.cos(a)*rr,y=Math.sin(a*1.13+i)*rr*.72;
-    const glow=c.createRadialGradient(x,y,0,x,y,radius*(.14+flash*.16));
-    glow.addColorStop(0,`rgba(255,242,185,${(.38*flash).toFixed(3)})`);
-    glow.addColorStop(.28,solarPlasma(.24*flash));
+    const glow=c.createRadialGradient(x,y,0,x,y,radius*(.032+flash*.022));
+    glow.addColorStop(0,`rgba(255,242,185,${(.24*flash).toFixed(3)})`);
+    glow.addColorStop(.34,solarPlasma(.12*flash));
     glow.addColorStop(1,'rgba(255,115,36,0)');
-    c.fillStyle=glow;c.fillRect(x-radius*.32,y-radius*.32,radius*.64,radius*.64);
-    c.strokeStyle=solarPlasma(.32*flash);c.lineWidth=1.1+flash*1.8;
-    for(let j=0;j<3;j++){
-      c.beginPath();
-      c.arc(x,y,radius*(.035+j*.045+phase*.06),0,TAU);
-      c.stroke();
-    }
-    for(let j=0;j<9;j++){
-      const b=j*TAU/9+t*.4,len=radius*(.045+flash*.1)*(j%3===0?1.45:1);
-      line(c,[x+Math.cos(b)*radius*.018,y+Math.sin(b)*radius*.018,x+Math.cos(b)*len,y+Math.sin(b)*len],`rgba(255,226,130,${(.22*flash).toFixed(3)})`,.75+flash*.7);
-    }
+    c.fillStyle=glow;c.fillRect(x-radius*.07,y-radius*.07,radius*.14,radius*.14);
+    const b=t*.5+i;
+    line(c,[x-radius*.014,y,x+Math.cos(b)*radius*.03,y+Math.sin(b)*radius*.018],`rgba(255,226,130,${(.14*flash).toFixed(3)})`,.45);
   }
   // Granular "nuclear reaction" flashes under the surface: many tiny kernels ignite and fade.
   for(let i=0;i<34;i++){
@@ -368,18 +354,17 @@ export function drawSolarActivity(c: Ctx, radius: number, t: number) {
     }
   }
   c.restore();c.save();c.globalCompositeOperation='lighter';
-  for(let i=0;i<4;i++){
-    const phase=(t/(21+i*4.5)+i*.18)%1;
-    const grow=smooth(phase/.38);
-    const tear=clamp01((phase-.45)/.18);
+  for(let i=0;i<2;i++){
+    const phase=(t/(22+i*5)+i*.18)%1;
+    const grow=smooth(phase/.45);
     const fade=1-smooth((phase-.78)/.18);
-    const env=Math.max(.04,fade*(.25+grow*.75));
-    const height=radius*(.18+grow*.34+tear*.18);
-    const width=radius*(.11+i*.012);
+    const env=Math.max(.035,fade*(.22+grow*.55));
+    const height=radius*(.09+grow*.16);
+    const width=radius*(.055+i*.007);
     c.save();c.rotate(i*1.72+.44+Math.sin(t*.04+i)*.08);c.translate(radius*.99,0);
-    // Magnetic loop rooted in the chromosphere. It stretches first, then the top pinches apart.
-    for(let j=0;j<20;j++){
-      const spread=j/19;
+    // Compact magnetic loop rooted in the chromosphere.
+    for(let j=0;j<10;j++){
+      const spread=j/9;
       const off=(spread-.5)*width*(1.25+.25*Math.sin(t*.33+j));
       const strandAlpha=env*(.07+(j%5)*.018);
       const g=c.createLinearGradient(0,0,height,0);
@@ -389,43 +374,13 @@ export function drawSolarActivity(c: Ctx, radius: number, t: number) {
       c.strokeStyle=g;c.lineWidth=.42+(j%4)*.18;
       c.beginPath();
       c.moveTo(-radius*.012,-width*.55+off*.18);
-      if(tear<.42){
-        c.bezierCurveTo(height*.62,-width*1.22+off,height*(1.06+.08*Math.sin(t*.24+j)),off,height*.36,width*.72+off*.2);
-      }else{
-        const split=(tear-.42)/.58;
-        c.bezierCurveTo(height*.38,-width*1.1+off,height*(.58+split*.12),-width*.88+off*.4,height*(.72+split*.18),-width*.18+off*.2);
-        c.moveTo(height*(.52+split*.36),width*.18+off*.2);
-        c.bezierCurveTo(height*(.72+split*.55),width*.58+off,height*(.45+split*.35),width*.9+off*.25,radius*.01,width*.56+off*.1);
-      }
+      c.bezierCurveTo(height*.62,-width*1.12+off,height*(1.02+.06*Math.sin(t*.24+j)),off,height*.34,width*.68+off*.2);
       c.stroke();
     }
-    if(tear>.18){
-      const burst=smooth((tear-.18)/.42)*fade;
-      const front=height*(.72+tear*.85);
-      for(let j=0;j<16;j++){
-        const q=(j/16+phase*1.35)%1;
-        const side=(j%2?1:-1);
-        const x=front*q+radius*.12*Math.sin(j*3.1);
-        const y=side*width*(.15+q*.95)+Math.sin(t*1.7+j)*radius*.018;
-        const size=radius*(.012+(j%5)*.004)*(1-q*.38);
-        disc(c,x,y,size,`rgba(255,${148+j%4*18},62,${(burst*(1-q)*.58).toFixed(3)})`);
-        line(c,[x-size*1.3,y,x-radius*(.11+.05*q),y-side*radius*.026],`rgba(255,169,74,${(burst*(1-q)*.32).toFixed(3)})`,.75);
-      }
-      for(let j=0;j<9;j++){
-        const spread=(j-4)/4;
-        const x0=height*(.62+tear*.18),y0=spread*width*.18;
-        const x1=front*(.72+tear*.36),y1=spread*width*(.9+tear*.55)+Math.sin(t*.9+j)*radius*.025;
-        line(c,[x0,y0,(x0+x1)/2,y1*.55,x1,y1],`rgba(255,196,91,${(burst*.2).toFixed(3)})`,.55+j%3*.18);
-      }
-      const shock=c.createRadialGradient(front*.58,0,0,front*.58,0,radius*(.34+tear*.3));
-      shock.addColorStop(0,`rgba(255,214,125,${(.18*burst).toFixed(3)})`);
-      shock.addColorStop(1,'rgba(255,118,44,0)');
-      c.fillStyle=shock;c.fillRect(front*.18,-radius*.48,radius*.9,radius*.96);
-    }
-    const foot=c.createRadialGradient(0,0,0,0,0,radius*.32);
-    foot.addColorStop(0,`rgba(250,144,56,${(env*.14).toFixed(3)})`);
+    const foot=c.createRadialGradient(0,0,0,0,0,radius*.18);
+    foot.addColorStop(0,`rgba(250,144,56,${(env*.1).toFixed(3)})`);
     foot.addColorStop(1,'rgba(250,144,56,0)');
-    c.fillStyle=foot;c.fillRect(-radius*.12,-radius*.3,radius*.42,radius*.6);
+    c.fillStyle=foot;c.fillRect(-radius*.08,-radius*.18,radius*.26,radius*.36);
     c.restore();
   }
   c.restore();
