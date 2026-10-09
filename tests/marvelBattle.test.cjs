@@ -202,6 +202,141 @@ test('an encounter keeps its original target through camera changes until the ne
   assert.notEqual(next.planet.id, chosen.planetId);
 });
 
+test('equally good approach positions do not mirror actors on consecutive moving-planet frames', () => {
+  // All six approach choices fit without clipping or nearby Sun/station penalties.
+  // Their radii differ only through floating-point rounding as the planet moves.
+  for (const villain of VILLAIN_IDS) {
+    const settings = teamSettings(31, [villain]);
+    let previous;
+    for (let frame = 0; frame < 600; frame++) {
+      const scene = { width: 1920, height: 1080, bottom: 130, station: null,
+        anchors: { earth: { x: 800 + frame * .03, y: 400 + frame * .01, radius: 30 } } };
+      const encounter = battleFrame(20 + frame / 60, scene, settings);
+      assert.ok(encounter);
+      assert.ok(Number.isFinite(encounter.attackAngle));
+      if (previous) {
+        assert.equal(encounter.attackAngle, previous.attackAngle, `${villain} does not alternate equivalent attack directions`);
+        assert.equal(encounter.villain.facing, previous.villain.facing, `${villain} does not mirror between frames`);
+        assert.ok(distance(encounter.villain, previous.villain) < .1, 'villain follows the 0.03/0.01 pixel planet step');
+        for (const hero of HERO_IDS) {
+          assert.equal(encounter.defenders[hero].facing, previous.defenders[hero].facing, `${hero} keeps a stable facing`);
+          assert.ok(distance(encounter.defenders[hero], previous.defenders[hero]) < .2, `${hero} only moves with the planet and gentle floating`);
+        }
+      }
+      previous = encounter;
+    }
+  }
+});
+
+test('a locked attack direction keeps solo and full-team formations continuous when score conditions change', () => {
+  for (const villain of VILLAIN_IDS) {
+    for (const mask of [1, 31]) {
+      const settings = teamSettings(mask, [villain]);
+      const selected = HERO_IDS.filter((id, index) => mask & (1 << index));
+      const initialScene = { width: 1920, height: 1080, bottom: 130, station: null,
+        anchors: { sun: { x: 1600, y: 800, radius: 35 }, earth: { x: 800, y: 400, radius: 30 } } };
+      const first = battleFrame(20, initialScene, settings);
+      const chosen = { cycle: first.cycle, planetId: first.planet.id, attackAngle: first.attackAngle };
+      const offset = { x: first.villain.x - first.planet.x, y: first.villain.y - first.planet.y };
+      let previous = first;
+      for (let frame = 1; frame < 600; frame++) {
+        const earth = { x: 800 + frame * .03, y: 400 + frame * .01, radius: 30 };
+        const oldApproach = { x: earth.x + offset.x, y: earth.y + offset.y };
+        // Station dragging and a changing Sun projection strongly favour a different
+        // approach side but do not intersect the existing hero guard positions.
+        const station = frame >= 150 && frame < 450 ? { ...oldApproach, radius: 90 } : null;
+        const sun = frame >= 300 && frame < 450 ? { ...oldApproach, radius: 35 } :
+          frame >= 450 ? null : { x: 1600 + frame * .01, y: 800, radius: 35 };
+        const scene = { ...initialScene, station, anchors: { sun, earth } };
+        const encounter = battleFrame(20 + frame / 60, scene, settings, chosen);
+        assert.ok(encounter);
+        assert.equal(encounter.planet.id, chosen.planetId);
+        assert.equal(encounter.planet.x, earth.x, 'the formation follows live target coordinates');
+        assert.equal(encounter.planet.y, earth.y);
+        assert.equal(encounter.attackAngle, chosen.attackAngle, 'the encounter keeps the original side even when scores change');
+        assert.equal(encounter.villain.facing, first.villain.facing);
+        assert.ok(distance(encounter.villain, previous.villain) < .1, `${villain} never jumps across the planet`);
+        assert.ok(distance(encounter.intercept, previous.intercept) < .1, 'shield interception does not jump to the opposite side');
+        for (const hero of selected) {
+          const defender = encounter.defenders[hero];
+          assert.equal(defender.facing, first.defenders[hero].facing, `${hero} does not alternate mirrored poses`);
+          assert.ok(distance(defender, previous.defenders[hero]) < .2, `${hero} formation is continuous`);
+          assert.equal(defender.target.x, encounter.villain.x);
+          assert.equal(defender.target.y, encounter.villain.y);
+        }
+        if (frame === 300) {
+          const unlocked = battleFrame(20 + frame / 60, scene, settings);
+          assert.notEqual(unlocked.attackAngle, chosen.attackAngle, 'fixture actually favours a new side without the encounter lock');
+        }
+        previous = encounter;
+      }
+      const changedScene = { ...initialScene, station: { x: first.villain.x, y: first.villain.y, radius: 90 } };
+      const fresh = battleFrame(BATTLE_CYCLE + 20, changedScene, settings);
+      const next = battleFrame(BATTLE_CYCLE + 20, changedScene, settings, chosen);
+      assert.equal(next.attackAngle, fresh.attackAngle, 'a new cycle can select its own approach direction');
+      assert.notEqual(next.attackAngle, chosen.attackAngle, 'the old direction is not retained forever');
+    }
+  }
+});
+
+test('vertical arrival, defense and retreat retain facing across subpixel rounding boundaries', () => {
+  for (const villain of VILLAIN_IDS) {
+    for (const mask of [1, 31]) {
+      for (const attackAngle of [-Math.PI / 2, Math.PI / 2]) {
+        const chosen = { cycle: 0, planetId: 'earth', attackAngle };
+        const settings = teamSettings(mask, [villain]);
+        for (const localStart of [1, 22, 37]) {
+          let previous;
+          for (let frame = 0; frame < 600; frame++) {
+            // 128 is a binary rounding boundary. A vertical cosine is close to zero,
+            // so raw projected-x comparisons could mirror actors or flip entry offsets.
+            const earth = { x: 128 + (frame % 2 ? 1e-6 : -1e-6), y: 380 + frame * .01, radius: 32 };
+            const scene = { width: 800, height: 1000, bottom: 100, station: null, anchors: { earth } };
+            const encounter = battleFrame(localStart + frame / 600, scene, settings, chosen);
+            assert.ok(encounter);
+            assert.equal(encounter.attackAngle, attackAngle);
+            if (previous) {
+              assert.equal(encounter.villain.facing, previous.villain.facing, `${villain} has no subpixel-facing flicker at t=${localStart}`);
+              assert.ok(distance(encounter.villain, previous.villain) < .05,
+                `${villain} entry/retreat offset stays continuous at t=${localStart}`);
+              for (const hero of Object.keys(encounter.defenders)) {
+                assert.equal(encounter.defenders[hero].facing, previous.defenders[hero].facing, `${hero} has no vertical-attack mirror flicker at t=${localStart}`);
+                const step = distance(encounter.defenders[hero], previous.defenders[hero]);
+                // During arrival/retreat heroes are also travelling their patrol path.
+                assert.ok(step < (localStart === 22 ? .1 : .5),
+                  `${villain}/${hero}, team=${mask}, t=${localStart}, frame=${frame}: step=${step}`);
+              }
+            }
+            previous = encounter;
+          }
+        }
+      }
+    }
+  }
+});
+
+test('hero rotation enters and leaves defense without an abrupt attitude jump', () => {
+  const circularDifference = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+  const scene = sceneFor();
+  for (const villain of VILLAIN_IDS) {
+    for (const mask of [1, 2, 4, 8, 16, 31]) {
+      const settings = teamSettings(mask, [villain]);
+      const first = battleFrame(10, scene, settings);
+      const chosen = { cycle: first.cycle, planetId: first.planet.id, attackAngle: first.attackAngle };
+      for (const boundary of [14, 36]) {
+        const before = battleFrame(boundary - .0001, scene, settings, chosen);
+        const after = battleFrame(boundary + .0001, scene, settings, chosen);
+        for (const hero of Object.keys(before.defenders)) {
+          assert.ok(circularDifference(before.defenders[hero].angle, after.defenders[hero].angle) < .01,
+            `${hero} rotation is continuous at the t=${boundary} defense transition`);
+          assert.ok(distance(before.defenders[hero], after.defenders[hero]) < .1,
+            `${hero} position is continuous at the defense transition`);
+        }
+      }
+    }
+  }
+});
+
 function finitePoint(point, message) {
   assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y), message);
 }

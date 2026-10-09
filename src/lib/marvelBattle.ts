@@ -18,6 +18,7 @@ export interface VillainFrame {
 }
 export interface BattleFrame {
   time: number; local: number; cycle: number; stage: BattleStage;
+  attackAngle: number;
   villain: VillainFrame;
   planet: Point & { id: string; name: string; radius: number };
   intercept: Point;
@@ -25,7 +26,7 @@ export interface BattleFrame {
   villainHealth: number; attackProgress: number;
   defenders: Partial<Record<HeroId, HeroFrame>>;
 }
-export interface BattleTarget { cycle: number; planetId: string }
+export interface BattleTarget { cycle: number; planetId: string; attackAngle?: number }
 
 const NAMES: Record<string, string> = { earth: 'ЗЕМЛЯ', mars: 'МАРС', jupiter: 'ЮПИТЕР', saturn: 'САТУРН', neptune: 'НЕПТУН', venus: 'ВЕНЕРА', uranus: 'УРАН', mercury: 'МЕРКУРИЙ' };
 const TARGET_IDS = Object.keys(NAMES);
@@ -71,17 +72,25 @@ export function battleFrame(time: number, scene: HeroScene, settings: ActivitySe
       y: sun.y + (distance > .01 ? dy / distance : 0) * clear });
   };
   const reach = planet.radius + (id === 'galactus' ? 200 : 165) * scale;
-  const candidates = [-.55, -2.6, .55, 2.6, -Math.PI / 2, Math.PI / 2].map(a =>
-    safe({ x: planet.x + Math.cos(a) * reach, y: planet.y + Math.sin(a) * reach }, 55 * scale));
+  const positionAt = (angle: number) => safe({
+    x: planet.x + Math.cos(angle) * reach, y: planet.y + Math.sin(angle) * reach,
+  }, 55 * scale);
   const score = (p: Point) => {
     const sun = scene.anchors.sun;
     return Math.hypot(p.x - planet.x, p.y - planet.y) -
       (sun ? Math.max(0, sun.radius + 75 * scale - Math.hypot(p.x - sun.x, p.y - sun.y)) * 2 : 0) -
       (scene.station ? Math.max(0, 85 * scale - Math.hypot(p.x - scene.station.x, p.y - scene.station.y)) : 0);
   };
-  let enemy = candidates.reduce((best, p) => score(p) > score(best) ? p : best);
+  // Choose a side once per encounter. Tiny score differences between equally distant
+  // positions must not mirror the whole formation on consecutive animation frames.
+  const attackAngle = chosen?.cycle === cycle && Number.isFinite(chosen.attackAngle)
+    ? chosen.attackAngle!
+    : [-.55, -2.6, .55, 2.6, -Math.PI / 2, Math.PI / 2].reduce((best, angle) =>
+      score(positionAt(angle)) > score(positionAt(best)) + .5 ? angle : best);
+  const attackSide: 1 | -1 = Math.cos(attackAngle) < -1e-6 ? -1 : 1;
+  let enemy = positionAt(attackAngle);
   const approach = ease(local / 6), retreat = ease((local - 36) / 5);
-  const enemyEntry = safe({ x: enemy.x + (enemy.x > planet.x ? 45 : -45) * scale, y: enemy.y - 35 * scale }, 50 * scale);
+  const enemyEntry = safe({ x: enemy.x + attackSide * 45 * scale, y: enemy.y - 35 * scale }, 50 * scale);
   enemy = mix(enemyEntry, enemy, approach * (1 - retreat));
   const dx = enemy.x - planet.x, dy = enemy.y - planet.y, distance = Math.max(1, Math.hypot(dx, dy));
   const ux = dx / distance, uy = dy / distance;
@@ -93,12 +102,12 @@ export function battleFrame(time: number, scene: HeroScene, settings: ActivitySe
   const victory = local >= 30 ? Math.sin(Math.PI * clamp((local - 30) / 6)) : 0;
   const villainHealth = 1 - ease((local - 15) / 20);
   const villain: VillainFrame = { id, ...enemy, angle: Math.sin(time * 1.5) * .03,
-    facing: enemy.x > planet.x ? -1 : 1, scale: scale * (id === 'galactus' ? 1.55 : 1.1),
+    facing: attackSide === 1 ? -1 : 1, scale: scale * (id === 'galactus' ? 1.55 : 1.1),
     opacity: ease(local / 2) * (1 - ease((local - 38) / 3)), time, phase: local / BATTLE_CYCLE,
     pose: stage === 'arrival' ? 'arrival' : stage === 'assault' ? 'charge' : stage === 'clash' ? 'attack' : stage === 'repelled' ? 'stagger' : 'retreat',
     action: stage === 'arrival' ? 'ПРИБЛИЖЕНИЕ' : stage === 'assault' ? 'АТАКА ПЛАНЕТЫ' : stage === 'clash' ? 'АТАКА ПЕРЕХВАЧЕНА' : stage === 'repelled' ? 'НАПАДЕНИЕ ОТРАЖЕНО' : 'ОТСТУПЛЕНИЕ',
     target: intercept, effect: attack };
-  const battle: BattleFrame = { time, local, cycle, stage, villain, planet, intercept, shield, attack, counter, victory,
+  const battle: BattleFrame = { time, local, cycle, stage, attackAngle, villain, planet, intercept, shield, attack, counter, victory,
     villainHealth, attackProgress: (local * .55) % 1, defenders: {} };
   const enemyAngle = Math.atan2(uy, ux);
   const engage = ease((local - 6) / 8) * (1 - ease((local - 36) / 5));
@@ -110,9 +119,14 @@ export function battleFrame(time: number, scene: HeroScene, settings: ActivitySe
       y: planet.y + Math.sin(enemyAngle + spread) * radius + Math.sin(time * 1.7 + i) * 2 * scale });
     const point = mix(patrol, guard, engage);
     const defending = local >= 14 && local < 36;
+    // Facing comes from the fixed formation, not subpixel screen-coordinate noise.
+    const guardDx = Math.cos(attackAngle) * reach - Math.cos(attackAngle + spread) * radius;
+    const combatFacing: 1 | -1 = Math.abs(guardDx) < 2 * scale ? attackSide : guardDx > 0 ? 1 : -1;
+    const guardAngle = Math.sin(time * .9 + i) * .06;
+    const turn = Math.atan2(Math.sin(guardAngle - patrol.angle), Math.cos(guardAngle - patrol.angle));
     const frame: HeroFrame = { ...patrol, ...point, combat: local >= 6,
-      facing: defending ? (enemy.x >= point.x ? 1 : -1) : 1,
-      angle: defending ? Math.sin(time * .9 + i) * .06 : patrol.angle,
+      facing: defending ? combatFacing : 1,
+      angle: patrol.angle + turn * engage,
       pose: defending ? (hero === 'thor' ? 'hammer' : hero === 'silverSurfer' ? 'surf' : 'blast') : patrol.pose,
       thrust: defending ? .22 : patrol.thrust,
       target: defending ? { x: enemy.x, y: enemy.y } : patrol.target,

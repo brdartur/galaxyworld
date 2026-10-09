@@ -436,3 +436,37 @@ test('reduced motion shows a visible stationary defense instead of an invisible 
   assert.deepEqual(overlay.draws.map(draw => [draw.frame.x, draw.frame.y]), coordinates);
   overlay.unmount();
 });
+
+test('the overlay retains the attack side when live station and planet anchors change', () => {
+  const defaults = load(path.resolve('src/lib/activitySettings.ts')).DEFAULT_ACTIVITIES;
+  for (const villain of ['thanos', 'ultron', 'galactus']) {
+    const settings = { ...defaults, thanos: false, ultron: false, galactus: false, [villain]: true };
+    const overlay = mountOverlay(settings);
+    overlay.anchors.current = { earth: { x: 800, y: 400, radius: 30 }, sun: { x: 1600, y: 800, radius: 35 } };
+    overlay.station.current = null;
+    let now = 1000;
+    overlay.tick(now);
+    for (let frame = 0; frame < 200; frame++) overlay.tick(now += 100);
+    const initial = overlay.battleDraws[0].battle;
+    assert.equal(initial.stage, 'clash');
+    const offset = { x: initial.villain.x - initial.planet.x, y: initial.villain.y - initial.planet.y };
+    let previous = initial;
+    for (let frame = 1; frame < 200; frame++) {
+      const earth = { x: 800 + frame * .03, y: 400 + frame * .01, radius: 30 };
+      overlay.anchors.current = { ...overlay.anchors.current, earth };
+      if (frame === 75) overlay.station.current = { x: earth.x + offset.x, y: earth.y + offset.y, radius: 90 };
+      overlay.tick(now += 40);
+      const encounter = overlay.battleDraws[0].battle;
+      assert.equal(encounter.attackAngle, initial.attackAngle, 'component passes the retained direction into every battleFrame');
+      assert.equal(encounter.planet.id, 'earth');
+      assert.equal(encounter.villain.facing, initial.villain.facing);
+      assert.ok(distance(encounter.villain, previous.villain) < .1, 'no villain mirror jump enters the drawing layer');
+      for (const hero of heroes.HERO_IDS) {
+        assert.equal(encounter.defenders[hero].facing, initial.defenders[hero].facing);
+        assert.ok(distance(encounter.defenders[hero], previous.defenders[hero]) < .25, 'drawn defense formation moves continuously');
+      }
+      previous = encounter;
+    }
+    overlay.unmount();
+  }
+});

@@ -97,7 +97,9 @@ export default function MarvelHeroes({ settings, anchors, station, showLabels }:
           // Show a stationary encounter rather than freezing the invisible arrival frame.
           const battleTime = reducedMotion.matches ? Math.floor(time.current / BATTLE_CYCLE) * BATTLE_CYCLE + 22 : time.current;
           const battle = battleFrame(battleTime, scene, current.settings, battleTarget.current);
-          if (battle) battleTarget.current = { cycle: battle.cycle, planetId: battle.planet.id };
+          if (battle && (battleTarget.current?.cycle !== battle.cycle || battleTarget.current.attackAngle === undefined)) {
+            battleTarget.current = { cycle: battle.cycle, planetId: battle.planet.id, attackAngle: battle.attackAngle };
+          }
           updateBattleData(battle);
           if (battle) {
             const villain = battle.villain;
