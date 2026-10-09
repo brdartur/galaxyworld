@@ -17,6 +17,11 @@ export const ACTIVITY_LABELS = {
   captainMarvel: "КАПИТАН МАРВЕЛ",
   nova: "НОВА",
   heroEffects: "ЭФФЕКТЫ ГЕРОЕВ",
+  battles: "НАПАДЕНИЯ",
+  thanos: "ТАНОС",
+  ultron: "АЛЬТРОН",
+  galactus: "ГАЛАКТУС",
+  battleEffects: "БОЕВЫЕ ЭФФЕКТЫ",
 } as const;
 
 export type ActivityKey = keyof typeof ACTIVITY_LABELS;
@@ -26,6 +31,7 @@ export const DEFAULT_ACTIVITIES: ActivitySettings = {
   radio: true, station: true, stationCrew: true, stationRepair: true, spacewalk: true, martian: true, disks: true,
   earthSatellites: false,
   ironMan: true, thor: true, silverSurfer: true, captainMarvel: true, nova: true, heroEffects: true,
+  battles: true, thanos: true, ultron: true, galactus: true, battleEffects: true,
 };
 export const SURFACE_ACTOR_SCALE = .7;
 export const SURFACE_DURATION = 40;

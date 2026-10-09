@@ -76,7 +76,8 @@ function glow(c: Ctx, x: number, y: number, r: number, color: string, strength =
 
 function localPoint(frame: HeroFrame, x: number, y: number): Point {
   const co = Math.cos(frame.angle), si = Math.sin(frame.angle);
-  return { x: frame.x + (x * co - y * si) * frame.scale, y: frame.y + (x * si + y * co) * frame.scale };
+  const facingX = x * (frame.facing ?? 1);
+  return { x: frame.x + (facingX * co - y * si) * frame.scale, y: frame.y + (facingX * si + y * co) * frame.scale };
 }
 
 function joints(frame: HeroFrame, side: number): Joints {
@@ -419,10 +420,10 @@ function labels(c: Ctx, frame: HeroFrame) {
 export function drawMarvelHero(c: Ctx, frame: HeroFrame, options: { effects: boolean; showLabel: boolean }) {
   if (!Number.isFinite(frame.x) || !Number.isFinite(frame.y) || !Number.isFinite(frame.scale) || frame.scale <= 0 || frame.opacity <= 0) return;
   c.save(); c.globalAlpha *= frame.opacity;
-  if (options.effects) effects(c, frame);
+  if (options.effects && !frame.combat) effects(c, frame);
   meteor(c, frame, options.effects);
   if (frame.hammer) hammer(c, frame.hammer.x, frame.hammer.y, frame.hammer.angle, frame.scale);
-  c.save(); c.translate(frame.x, frame.y); c.rotate(frame.angle); c.scale(frame.scale, frame.scale);
+  c.save(); c.translate(frame.x, frame.y); c.rotate(frame.angle); c.scale(frame.scale * (frame.facing ?? 1), frame.scale);
   heroBody(c, frame, options.effects); c.restore();
   if (options.showLabel) labels(c, frame);
   c.restore();

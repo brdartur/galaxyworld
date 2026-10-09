@@ -1,5 +1,8 @@
 import { ACTIVITY_LABELS, type ActivitySettings, type ActivityKey } from "../lib/activitySettings";
 import { HERO_IDS, HERO_DETAILS } from "../lib/marvelHeroes";
+import { VILLAIN_IDS, VILLAIN_DETAILS } from "../lib/marvelBattle";
+
+const BATTLE_KEYS: ActivityKey[] = ['battles', ...VILLAIN_IDS, 'battleEffects'];
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const MIN_SPEED = 0.5;
@@ -220,7 +223,7 @@ export default function ControlBar({
         <span className="font-mono text-[11px] font-semibold tracking-wide text-amber">СООБЩЕНИЯ</span>
       </button>
       <div className="flex w-full max-w-[88vw] gap-1.5 overflow-x-auto border-t border-line pt-2 pb-1" role="group" aria-label="Сценарии и эффекты">
-        {(Object.keys(ACTIVITY_LABELS) as ActivityKey[]).filter(key => !(HERO_IDS as readonly string[]).includes(key) && key !== 'heroEffects').map(key => (
+        {(Object.keys(ACTIVITY_LABELS) as ActivityKey[]).filter(key => !(HERO_IDS as readonly string[]).includes(key) && key !== 'heroEffects' && !BATTLE_KEYS.includes(key)).map(key => (
           <Toggle key={key} active={activities[key]} onClick={() => onToggleActivity(key)} label={ACTIVITY_LABELS[key]} />
         ))}
       </div>
@@ -229,7 +232,16 @@ export default function ControlBar({
         {HERO_IDS.map(key => <Toggle key={key} active={activities[key]} onClick={() => onToggleActivity(key)}
           label={ACTIVITY_LABELS[key]} title={HERO_DETAILS[key].mission} />)}
         <Toggle active={activities.heroEffects} onClick={() => onToggleActivity('heroEffects')}
-          label={ACTIVITY_LABELS.heroEffects} title="Световые следы, молнии, сканирование и лучи героев" />
+          label={ACTIVITY_LABELS.heroEffects} title="Свечение и следы героев во время полёта и исследования" />
+      </div>
+      <div className="flex w-full max-w-[88vw] items-center gap-1.5 overflow-x-auto border-t border-line pt-2 pb-1" role="group" aria-label="Нападения злодеев Marvel">
+        <span className="shrink-0 pr-1 font-mono text-[10px] tracking-widest text-dim">УГРОЗЫ</span>
+        <Toggle active={activities.battles} onClick={() => onToggleActivity('battles')}
+          label={ACTIVITY_LABELS.battles} title="Нападения на планеты и защита выбранными героями" />
+        {VILLAIN_IDS.map(key => <Toggle key={key} active={activities[key]} onClick={() => onToggleActivity(key)}
+          label={ACTIVITY_LABELS[key]} title={VILLAIN_DETAILS[key].mission} />)}
+        <Toggle active={activities.battleEffects} onClick={() => onToggleActivity('battleEffects')}
+          label={ACTIVITY_LABELS.battleEffects} title="Боевые лучи, защитные поля, попадания и ударные волны" />
       </div>
     </div>
   );

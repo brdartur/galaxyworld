@@ -2,6 +2,8 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import type { ActivitySettings } from '../lib/activitySettings';
 import { HERO_DETAILS, HERO_IDS, heroFrame, type HeroAnchors } from '../lib/marvelHeroes';
 import { drawMarvelHero } from '../lib/marvelDrawing';
+import { battleFrame, BATTLE_CYCLE, VILLAIN_DETAILS, VILLAIN_IDS, type BattleFrame, type BattleTarget } from '../lib/marvelBattle';
+import { drawBattleBackdrop, drawBattleForeground } from '../lib/marvelBattleDrawing';
 import type { ScreenAnchor } from '../lib/radioSignal';
 
 interface MarvelHeroesProps {
@@ -17,8 +19,11 @@ export default function MarvelHeroes({ settings, anchors, station, showLabels }:
   const flags = useRef({ settings, showLabels });
   flags.current = { settings, showLabels };
   const time = useRef(0);
+  const battleTarget = useRef<BattleTarget>();
   const synchronize = useRef<(() => void) | null>(null);
   const enabledHeroes = HERO_IDS.filter(id => settings[id]);
+  const enabledVillains = VILLAIN_IDS.filter(id => settings[id]);
+  const battleEnabled = settings.battles && enabledHeroes.length > 0 && enabledVillains.length > 0;
 
   useEffect(() => {
     const el = canvas.current;
@@ -31,6 +36,20 @@ export default function MarvelHeroes({ settings, anchors, station, showLabels }:
     let pointer: { x: number; y: number } | null = null;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const controls = parent.querySelector<HTMLElement>('[data-map-controls]');
+
+    const updateBattleData = (battle: BattleFrame | null) => {
+      const values = {
+        battleStage: battle?.stage,
+        battleVillain: battle?.villain.id,
+        battlePlanet: battle?.planet.id,
+        defendingHeroes: battle ? HERO_IDS.filter(id => battle.defenders[id]).join(',') : undefined,
+      };
+      for (const [key, value] of Object.entries(values)) {
+        if (value === undefined) {
+          if (el.dataset[key] !== undefined) delete el.dataset[key];
+        } else if (el.dataset[key] !== value) el.dataset[key] = value;
+      }
+    };
 
     const clear = () => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -74,20 +93,36 @@ export default function MarvelHeroes({ settings, anchors, station, showLabels }:
             station: current.settings.station ? station.current : null,
           };
           const effects = current.settings.heroEffects && !reducedMotion.matches;
+          const battleEffects = current.settings.battleEffects && !reducedMotion.matches;
+          // Show a stationary encounter rather than freezing the invisible arrival frame.
+          const battleTime = reducedMotion.matches ? Math.floor(time.current / BATTLE_CYCLE) * BATTLE_CYCLE + 22 : time.current;
+          const battle = battleFrame(battleTime, scene, current.settings, battleTarget.current);
+          if (battle) battleTarget.current = { cycle: battle.cycle, planetId: battle.planet.id };
+          updateBattleData(battle);
+          if (battle) {
+            const villain = battle.villain;
+            const hovered = pointer !== null &&
+              Math.abs(pointer.x - villain.x) <= (villain.id === 'ultron' ? 58 : 45) * villain.scale + 8 &&
+              Math.abs(pointer.y - villain.y) <= 62 * villain.scale + 8;
+            drawBattleBackdrop(ctx, battle, { effects: battleEffects, showLabel: current.showLabels || hovered });
+          }
           for (const id of HERO_IDS) {
             if (!current.settings[id]) continue;
-            const pose = heroFrame(id, time.current, scene);
+            const pose = battle?.defenders[id] ?? heroFrame(id, time.current, scene);
             const hovered = pointer !== null &&
               Math.abs(pointer.x - pose.x) <= 42 * pose.scale + 8 &&
               Math.abs(pointer.y - pose.y) <= 53 * pose.scale + 8;
             drawMarvelHero(ctx, pose, { effects, showLabel: current.showLabels || hovered });
           }
-        }
+          if (battle) drawBattleForeground(ctx, battle, { effects: battleEffects });
+        } else updateBattleData(null);
       }
       raf = requestAnimationFrame(frame);
     };
     const sync = () => {
       if (disposed) return;
+      const settings = flags.current.settings;
+      if (!settings.battles || !active() || !VILLAIN_IDS.some(id => settings[id])) updateBattleData(null);
       if (document.hidden || !active()) {
         stop();
         if (document.hidden) pointer = null;
@@ -119,6 +154,7 @@ export default function MarvelHeroes({ settings, anchors, station, showLabels }:
     return () => {
       disposed = true;
       stop();
+      updateBattleData(null);
       synchronize.current = null;
       observer.disconnect();
       parent.removeEventListener('pointermove', onPointerMove, true);
@@ -136,10 +172,12 @@ export default function MarvelHeroes({ settings, anchors, station, showLabels }:
       aria-hidden
       data-marvel-heroes
       data-enabled-heroes={enabledHeroes.join(',')}
+      data-battle-enabled={battleEnabled ? 'true' : 'false'}
       className="pointer-events-none absolute inset-0 z-[11] h-full w-full"
     />
     {enabledHeroes.length > 0 && <ul className="pointer-events-none sr-only" aria-label="Космические герои и их задания">
-      {enabledHeroes.map(id => <li key={id}>{HERO_DETAILS[id].name}: {HERO_DETAILS[id].mission}</li>)}
+      {enabledHeroes.map(id => <li key={id}>{HERO_DETAILS[id].name}: {battleEnabled ? 'Защита планет от нападений. ' : ''}{HERO_DETAILS[id].mission}</li>)}
+      {battleEnabled && enabledVillains.map(id => <li key={id}>{VILLAIN_DETAILS[id].name}: {VILLAIN_DETAILS[id].mission}. Атаки отражают выбранные герои.</li>)}
     </ul>}
   </>;
 }

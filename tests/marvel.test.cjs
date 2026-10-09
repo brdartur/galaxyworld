@@ -225,7 +225,7 @@ test('procedural drawing balances Canvas state with all effects and captions com
 // Mount the real component with a small deterministic hooks/RAF harness. The Canvas
 // drawing is replaced by a recorder, while settings, lifecycle and heroFrame remain real.
 function mountOverlay(initialSettings) {
-  const draws = [], pending = new Map(), refs = [], effects = [];
+  const draws = [], battleDraws = [], pending = new Map(), refs = [], effects = [];
   const docListeners = new Map(), parentListeners = new Map(), mediaListeners = new Map();
   const media = { matches: false, addEventListener: (key, fn) => mediaListeners.set(key, fn),
     removeEventListener: key => mediaListeners.delete(key) };
@@ -237,7 +237,7 @@ function mountOverlay(initialSettings) {
     removeEventListener: key => parentListeners.delete(key),
   };
   let clearCount = 0, disconnectCount = 0, sequence = 0, hook = 0;
-  const canvas = { parentElement: parent, width: 0, height: 0,
+  const canvas = { parentElement: parent, width: 0, height: 0, dataset: {},
     getContext: () => ({ setTransform() {}, clearRect() { clearCount++; } }) };
   const document = { hidden: false, addEventListener: (key, fn) => docListeners.set(key, fn),
     removeEventListener: key => docListeners.delete(key) };
@@ -266,6 +266,11 @@ function mountOverlay(initialSettings) {
       if (id === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'fragment' };
       if (id.endsWith('/marvelHeroes')) return heroes;
       if (id.endsWith('/marvelDrawing')) return { drawMarvelHero(ctx, frame, options) { draws.push({ frame, options }); } };
+      if (id.endsWith('/marvelBattle')) return load(path.resolve('src/lib/marvelBattle.ts'));
+      if (id.endsWith('/marvelBattleDrawing')) return {
+        drawBattleBackdrop(ctx, battle, options) { battleDraws.push({ layer: 'backdrop', battle, options }); },
+        drawBattleForeground(ctx, battle, options) { battleDraws.push({ layer: 'foreground', battle, options }); },
+      };
       throw new Error(`Unexpected component dependency: ${id}`);
     },
     window: { devicePixelRatio: 3, matchMedia: () => media }, document,
@@ -292,8 +297,8 @@ function mountOverlay(initialSettings) {
   };
   render();
   return {
-    draws, settings, canvas, document, media, anchors, station, render,
-    tick(now) { draws.length = 0; const callbacks = [...pending.values()]; pending.clear(); callbacks.forEach(fn => fn(now)); },
+    draws, battleDraws, settings, canvas, document, media, anchors, station, render,
+    tick(now) { draws.length = 0; battleDraws.length = 0; const callbacks = [...pending.values()]; pending.clear(); callbacks.forEach(fn => fn(now)); },
     pending: () => pending.size,
     hidden(value) { document.hidden = value; docListeners.get('visibilitychange')(); },
     hover(x, y) { parentListeners.get('pointermove')({ pointerType: 'mouse', clientX: x + 10, clientY: y + 20 }); },
@@ -367,4 +372,67 @@ test('overlay toggles heroes independently and resumes after all-off or tab visi
   assert.equal(overlay.pending(), 0, 'unmount cancels RAF');
   assert.equal(overlay.listeners(), 0, 'unmount removes pointer, visibility and media listeners');
   assert.equal(overlay.disconnectCount(), 1, 'unmount releases ResizeObserver');
+});
+
+test('the real overlay lets one chosen hero defend and keeps battle effects independent', () => {
+  const defaults = load(path.resolve('src/lib/activitySettings.ts')).DEFAULT_ACTIVITIES;
+  const settings = { ...defaults, thanos: false, galactus: false };
+  heroes.HERO_IDS.forEach(id => { settings[id] = id === 'ironMan'; });
+  const overlay = mountOverlay(settings);
+  let now = 1000;
+  overlay.tick(now);
+  for (let frame = 0; frame < 200; frame++) overlay.tick(now += 100);
+  assert.equal(overlay.draws.length, 1, 'selected solo hero is the only visible defender');
+  assert.equal(overlay.draws[0].frame.id, 'ironMan');
+  assert.equal(overlay.draws[0].frame.combat, true);
+  assert.match(overlay.draws[0].frame.action, /ЗАЩИТА/);
+  assert.deepEqual(overlay.battleDraws.map(draw => draw.layer), ['backdrop', 'foreground']);
+  const encounter = overlay.battleDraws[0].battle;
+  assert.equal(encounter.villain.id, 'ultron');
+  assert.equal(overlay.draws[0].frame.target.x, encounter.villain.x);
+  assert.equal(overlay.draws[0].frame.target.y, encounter.villain.y);
+  assert.equal(overlay.canvas.dataset.battleStage, 'clash');
+  assert.equal(overlay.canvas.dataset.battleVillain, 'ultron');
+  assert.equal(overlay.canvas.dataset.defendingHeroes, 'ironMan');
+
+  overlay.render({ settings: { ...settings, battleEffects: false } });
+  overlay.tick(now += 100);
+  assert.ok(overlay.battleDraws.every(draw => !draw.options.effects));
+  assert.equal(overlay.draws[0].options.effects, true, 'hero effects retain their own toggle');
+  assert.equal(overlay.draws[0].frame.combat, true, 'effect toggle keeps the defensive action');
+  for (let frame = 0; frame < 160; frame++) overlay.tick(now += 100);
+  assert.equal(overlay.battleDraws[0].battle.villainHealth, 0, 'one hero can fully repel the attack');
+
+  overlay.render({ settings: { ...settings, battles: false } });
+  overlay.tick(now += 100);
+  assert.equal(overlay.battleDraws.length, 0);
+  assert.equal(overlay.draws.length, 1, 'disabling attacks preserves the selected patrol hero');
+  assert.equal(overlay.draws[0].frame.combat, undefined);
+  assert.equal(overlay.canvas.dataset.battleStage, undefined, 'stale battle metadata is cleared');
+  assert.equal(overlay.canvas.dataset.battleVillain, undefined);
+
+  overlay.render({ settings: { ...settings, ironMan: false } });
+  assert.equal(overlay.pending(), 0, 'no chosen heroes pause all battle animation');
+  overlay.tick(now += 1000);
+  assert.equal(overlay.draws.length, 0);
+  assert.equal(overlay.battleDraws.length, 0, 'an enemy is not drawn without chosen defenders');
+  assert.equal(overlay.canvas.dataset.defendingHeroes, undefined);
+  overlay.unmount();
+});
+
+test('reduced motion shows a visible stationary defense instead of an invisible arrival', () => {
+  const defaults = load(path.resolve('src/lib/activitySettings.ts')).DEFAULT_ACTIVITIES;
+  const overlay = mountOverlay(defaults);
+  overlay.reduced(true);
+  overlay.tick(1000);
+  assert.equal(overlay.battleDraws[0].battle.stage, 'clash');
+  assert.ok(overlay.battleDraws[0].battle.villain.opacity > .9, 'the stationary villain is actually visible');
+  assert.ok(overlay.draws.every(draw => draw.frame.combat && !draw.options.effects));
+  assert.ok(overlay.battleDraws.every(draw => !draw.options.effects));
+  const time = overlay.battleDraws[0].battle.time;
+  const coordinates = overlay.draws.map(draw => [draw.frame.x, draw.frame.y]);
+  overlay.tick(60000);
+  assert.equal(overlay.battleDraws[0].battle.time, time);
+  assert.deepEqual(overlay.draws.map(draw => [draw.frame.x, draw.frame.y]), coordinates);
+  overlay.unmount();
 });

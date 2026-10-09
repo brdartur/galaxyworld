@@ -11,6 +11,8 @@ export interface HeroFrame {
   action: string; target: Point | null; trail: Point[];
   hammer?: Point & { angle: number; returning: boolean };
   meteor?: Point & { radius: number };
+  combat?: boolean;
+  facing?: 1 | -1;
 }
 export interface HeroScene {
   width: number; height: number; bottom: number;
