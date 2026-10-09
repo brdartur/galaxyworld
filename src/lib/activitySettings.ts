@@ -11,6 +11,12 @@ export const ACTIVITY_LABELS = {
   martian: "РАКЕТА МАРСИАНИНА",
   disks: "ПРОТОДИСКИ",
   earthSatellites: "СПУТНИКИ ЗЕМЛИ",
+  ironMan: "ЖЕЛЕЗНЫЙ ЧЕЛОВЕК",
+  thor: "ТОР",
+  silverSurfer: "СЕРЕБРЯНЫЙ СЁРФЕР",
+  captainMarvel: "КАПИТАН МАРВЕЛ",
+  nova: "НОВА",
+  heroEffects: "ЭФФЕКТЫ ГЕРОЕВ",
 } as const;
 
 export type ActivityKey = keyof typeof ACTIVITY_LABELS;
@@ -19,6 +25,7 @@ export const DEFAULT_ACTIVITIES: ActivitySettings = {
   drilling: true, research: true, rovers: true, solar: true,
   radio: true, station: true, stationCrew: true, stationRepair: true, spacewalk: true, martian: true, disks: true,
   earthSatellites: false,
+  ironMan: true, thor: true, silverSurfer: true, captainMarvel: true, nova: true, heroEffects: true,
 };
 export const SURFACE_ACTOR_SCALE = .7;
 export const SURFACE_DURATION = 40;

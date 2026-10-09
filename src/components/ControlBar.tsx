@@ -1,4 +1,5 @@
 import { ACTIVITY_LABELS, type ActivitySettings, type ActivityKey } from "../lib/activitySettings";
+import { HERO_IDS, HERO_DETAILS } from "../lib/marvelHeroes";
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const MIN_SPEED = 0.5;
@@ -219,19 +220,27 @@ export default function ControlBar({
         <span className="font-mono text-[11px] font-semibold tracking-wide text-amber">СООБЩЕНИЯ</span>
       </button>
       <div className="flex w-full max-w-[88vw] gap-1.5 overflow-x-auto border-t border-line pt-2 pb-1" role="group" aria-label="Сценарии и эффекты">
-        {(Object.keys(ACTIVITY_LABELS) as ActivityKey[]).map(key => (
+        {(Object.keys(ACTIVITY_LABELS) as ActivityKey[]).filter(key => !(HERO_IDS as readonly string[]).includes(key) && key !== 'heroEffects').map(key => (
           <Toggle key={key} active={activities[key]} onClick={() => onToggleActivity(key)} label={ACTIVITY_LABELS[key]} />
         ))}
+      </div>
+      <div className="flex w-full max-w-[88vw] items-center gap-1.5 overflow-x-auto border-t border-line pt-2 pb-1" role="group" aria-label="Герои Marvel">
+        <span className="shrink-0 pr-1 font-mono text-[10px] tracking-widest text-dim">MARVEL</span>
+        {HERO_IDS.map(key => <Toggle key={key} active={activities[key]} onClick={() => onToggleActivity(key)}
+          label={ACTIVITY_LABELS[key]} title={HERO_DETAILS[key].mission} />)}
+        <Toggle active={activities.heroEffects} onClick={() => onToggleActivity('heroEffects')}
+          label={ACTIVITY_LABELS.heroEffects} title="Световые следы, молнии, сканирование и лучи героев" />
       </div>
     </div>
   );
 }
 
-function Toggle({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+function Toggle({ active, onClick, label, title }: { active: boolean; onClick: () => void; label: string; title?: string }) {
   return (
     <button
       onClick={onClick}
       aria-pressed={active}
+      title={title}
       className={`flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[11px] tracking-wide transition-all duration-150 active:scale-90 ${
         active ? "border-teal/50 bg-teal/10 text-teal" : "border-line text-faint hover:text-dim"
       }`}

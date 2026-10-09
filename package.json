@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/activities.test.cjs"
+    "test": "node --test tests/activities.test.cjs tests/marvel.test.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

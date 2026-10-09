@@ -10,6 +10,7 @@ import CosmicEvents3D, { DeepSpace } from "./CosmicEvents3D";
 import ActivityScene3D from "./ActivityScene3D";
 import { solarPlasma } from '../lib/solarAppearance';
 import type { ScreenAnchor } from '../lib/radioSignal';
+import type { HeroAnchors } from '../lib/marvelHeroes';
 import { SURFACE_ACTOR_SCALE, SURFACE_DURATION, type ActivitySettings } from "../lib/activitySettings";
 
 const TAU = Math.PI * 2;
@@ -29,6 +30,7 @@ function mulberry32(seed: number) {
 
 interface SceneProps {
   earthAnchor: MutableRefObject<ScreenAnchor | null>;
+  heroAnchors: MutableRefObject<HeroAnchors>;
   activities: ActivitySettings;
   playing: boolean;
   speed: number;
@@ -205,7 +207,8 @@ function SaturnRing({ pr, tex }: { pr: number; tex: THREE.CanvasTexture }) {
 function System(props: SceneProps) {
   const screenPoint = useMemo(() => new THREE.Vector3(), []);
   const screenEdge = useMemo(() => new THREE.Vector3(), []);
-  useEffect(() => () => { props.earthAnchor.current = null; }, [props.earthAnchor]);
+  const heroWorld = useMemo(() => new THREE.Vector3(), []);
+  useEffect(() => () => { props.earthAnchor.current = null; props.heroAnchors.current = {}; }, [props.earthAnchor, props.heroAnchors]);
   const sim = useRef(props.initialDays);
   const playingRef = useRef(props.playing);
   playingRef.current = props.playing;
@@ -339,6 +342,20 @@ function System(props: SceneProps) {
       props.earthAnchor.current = Math.abs(screenPoint.x) <= 1 && Math.abs(screenPoint.y) <= 1 && Math.abs(screenPoint.z) <= 1
         ? { x: (screenPoint.x+1)*size.width/2, y: (1-screenPoint.y)*size.height/2, radius } : null;
     }
+
+    const anchors: HeroAnchors = {};
+    for (const body of [SUN, ...PLANETS]) {
+      const group = groups.current[body.id];
+      if (body.id !== SUN.id && !group) continue;
+      if (group) heroWorld.copy(group.position); else heroWorld.set(0, 0, 0);
+      const worldRadius = body.id === SUN.id ? SUN_R : planetR3(body.diameterKm) * (group?.scale.x ?? 1);
+      screenPoint.copy(heroWorld).project(camera);
+      screenEdge.set(worldRadius, 0, 0).applyQuaternion(camera.quaternion).add(heroWorld).project(camera);
+      const radius = Math.hypot((screenEdge.x - screenPoint.x) * size.width / 2, (screenEdge.y - screenPoint.y) * size.height / 2);
+      anchors[body.id] = Math.abs(screenPoint.z) <= 1 && Number.isFinite(radius)
+        ? { x: (screenPoint.x + 1) * size.width / 2, y: (1 - screenPoint.y) * size.height / 2, radius } : null;
+    }
+    props.heroAnchors.current = anchors;
 
     // Солнце тоже вращается (грануляция ползёт)
     if (sunMeshRef.current) {

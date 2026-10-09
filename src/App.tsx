@@ -3,6 +3,8 @@ import RadioLink from './components/RadioLink';
 import type { ScreenAnchor } from './lib/radioSignal';
 import DraggableStation from "./components/DraggableStation";
 import EarthSatellitesInset from "./components/EarthSatellitesInset";
+import MarvelHeroes from "./components/MarvelHeroes";
+import type { HeroAnchors } from "./lib/marvelHeroes";
 import SolarCanvas from "./components/SolarCanvas";
 import SolarScene3D from "./components/SolarScene3D";
 import ControlBar from "./components/ControlBar";
@@ -61,6 +63,7 @@ export default function App() {
   const [isFs, setIsFs] = useState(false);
   const earthAnchor = useRef<ScreenAnchor | null>(null);
   const stationAnchor = useRef<ScreenAnchor | null>(null);
+  const heroAnchors = useRef<HeroAnchors>({});
   const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -200,6 +203,7 @@ export default function App() {
           {view3d ? (
             <SolarScene3D
               earthAnchor={earthAnchor}
+              heroAnchors={heroAnchors}
               playing={playing}
               speed={speed}
               showOrbits={showOrbits}
@@ -222,6 +226,7 @@ export default function App() {
           ) : (
             <SolarCanvas
               earthAnchor={earthAnchor}
+              heroAnchors={heroAnchors}
               playing={playing}
               speed={speed}
               showOrbits={showOrbits}
@@ -245,6 +250,7 @@ export default function App() {
 
           <RadioLink enabled={activities.radio && activities.station} station={stationAnchor} earth={earthAnchor} />
           <DraggableStation settings={activities} antenna={stationAnchor} />
+          <MarvelHeroes settings={activities} anchors={heroAnchors} station={stationAnchor} showLabels={showLabels} />
           {activities.earthSatellites && <EarthSatellitesInset onClose={closeEarthSatellites} />}
 
           <MobileChips selectedId={selectedId} hoverId={hoverId} onSelect={inspect} />

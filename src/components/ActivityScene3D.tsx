@@ -48,8 +48,7 @@ function ActivitySprite({ draw, place, size = 320 }: {
 }
 
 export default function ActivityScene3D({ settings, showAstro, mission, planets, time }: Props) {
-  const camera = useThree(s => s.camera);
-  const viewportSize = useThree(s => s.size);
+  const { camera, size: viewportSize } = useThree();
   const direction = useMemo(() => new THREE.Vector3(), []);
   const explorerRadius = useRef(64);
   const roverRadius = useRef(64);

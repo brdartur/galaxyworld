@@ -6,6 +6,7 @@ import { getTexture } from "../lib/textures";
 
 import { solarPlasma } from '../lib/solarAppearance';
 import type { ScreenAnchor } from '../lib/radioSignal';
+import type { HeroAnchors } from '../lib/marvelHeroes';
 import { SURFACE_ACTOR_SCALE, SURFACE_DURATION, ROVER_PLANETS, smooth, type ActivitySettings } from "../lib/activitySettings";
 import { drawSurfaceExplorer, drawRover, drawLander, drawSolarActivity, drawMartianShip } from "../lib/activityDrawing";
 
@@ -337,6 +338,7 @@ function buildFrame(body: BodyData, k: number): HTMLCanvasElement {
 
 interface Props {
   earthAnchor: MutableRefObject<ScreenAnchor | null>;
+  heroAnchors: MutableRefObject<HeroAnchors>;
   activities: ActivitySettings;
   playing: boolean;
   speed: number;
@@ -1082,15 +1084,15 @@ export default function SolarCanvas(props: Props) {
     const drawAstronaut = () => {
       const a = astronaut;
       if (!propsRef.current.showAstro) return;
-      
+
       ctx.save();
       ctx.translate(a.x, a.y);
       ctx.rotate(a.angle);
       ctx.scale(2 * activityScale(), 2 * activityScale());
-      
+
       drawLander(ctx, worldT, a.mode === "toPlanet" || a.mode === "takeoff" || a.mode === "landing", a.mode === "surface" || a.mode === "landing");
       ctx.restore();
-      
+
       if (a.mode === "surface") {
         const target = placed.find(body => body.id === PLANETS[a.targetIdx].id);
         if (target) {
@@ -2222,6 +2224,9 @@ export default function SolarCanvas(props: Props) {
         placed.push({ id: d.id, x, y, r: pr, hit: Math.max(pr + 9, 13) });
       }
 
+      propsRef.current.heroAnchors.current = Object.fromEntries(placed.map(body => [body.id,
+        { x: body.x, y: body.y, radius: body.r }]));
+
       /* ---- Солнце: статичное, постоянный диаметр ---- */
       // Корона в той же оранжевой палитре, что и протуберанцы
       const glowR = sunR * 3.4;
@@ -2558,6 +2563,7 @@ export default function SolarCanvas(props: Props) {
 
     return () => {
       propsRef.current.earthAnchor.current = null;
+      propsRef.current.heroAnchors.current = {};
       cancelAnimationFrame(raf);
       ro.disconnect();
       canvas.removeEventListener('wheel', onWheel);
